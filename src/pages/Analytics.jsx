@@ -1,362 +1,277 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Clock, FileText, ChevronDown, ChevronUp, Printer, TrendingUp, DollarSign, Award, PieChart as PieChartIcon, BarChart as BarChartIcon } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
+import { TrendingUp, DollarSign, ShoppingBag, AlertTriangle, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend } from 'recharts';
 
 const Analytics = () => {
-    const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [expandedOrderId, setExpandedOrderId] = useState(null);
-    const [stats, setStats] = useState({
-        totalRevenue: 0,
-        totalProfit: 0,
-        margin: 0,
-        averageOrderValue: 0,
-        topItems: [],
-        salesTrend: [],
-        categoryData: [],
-        peakHours: []
+    const [timeRange, setTimeRange] = useState('week'); // 'today', 'week', 'month'
+    const [metrics, setMetrics] = useState({
+        revenue: 0,
+        orders: 0,
+        avgOrderValue: 0,
+        wastageCost: 0,
+        netProfit: 0
     });
+    const [revenueData, setRevenueData] = useState([]);
+    const [categoryData, setCategoryData] = useState([]);
+    const [topItems, setTopItems] = useState([]);
 
     useEffect(() => {
-        fetchData();
+        fetchAnalytics();
+    }, [timeRange]);
 
-        const subscription = supabase
-            .channel('orders_analytics')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-                console.log('Analytics: Order update detected, refreshing data...');
-                fetchData();
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(subscription);
-        };
-    }, []);
-
-    const fetchData = async () => {
+    const fetchAnalytics = async () => {
         setLoading(true);
-        // 1. Fetch Orders with Items
-        const { data: ordersData } = await supabase
+
+        // Calculate date range
+        const now = new Date();
+        let startDate = new Date();
+        if (timeRange === 'today') startDate.setHours(0, 0, 0, 0);
+        if (timeRange === 'week') startDate.setDate(now.getDate() - 7);
+        if (timeRange === 'month') startDate.setMonth(now.getMonth() - 1);
+
+        // Fetch Orders
+        const { data: orders } = await supabase
             .from('orders')
-            .select(`*, order_items (*, menu_items (id, name, category, price))`)
-            .order('created_at', { ascending: false });
+            .select('*, order_items(*, menu_items(*))')
+            .gte('created_at', startDate.toISOString())
+            .neq('status', 'cancelled');
 
-        // 2. Fetch Recipes & Ingredients for Costing
-        const { data: recipesData } = await supabase
-            .from('recipes')
-            .select(`*, ingredients (id, purchase_price, yield_percent)`);
+        // Fetch Wastage
+        const { data: wastage } = await supabase
+            .from('wastage_logs')
+            .select('*')
+            .gte('created_at', startDate.toISOString());
 
-        if (ordersData && recipesData) {
-            setOrders(ordersData);
-            calculateAdvancedStats(ordersData, recipesData);
+        if (orders && wastage) {
+            processAnalytics(orders, wastage);
         }
         setLoading(false);
     };
 
-    const calculateAdvancedStats = (orders, recipes) => {
-        // A. Calculate Cost per Menu Item
-        const itemCosts = {}; // { menu_item_id: cost }
+    const processAnalytics = (orders, wastage) => {
+        // 1. Key Metrics
+        const totalRevenue = orders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+        const totalOrders = orders.length;
+        const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+        const totalWastage = wastage.reduce((sum, log) => sum + (log.cost_at_time || 0), 0);
 
-        // Group recipes by menu_item_id
-        const recipeMap = {};
-        recipes.forEach(r => {
-            if (!recipeMap[r.menu_item_id]) recipeMap[r.menu_item_id] = [];
-            recipeMap[r.menu_item_id].push(r);
-        });
-
-        // Calculate cost for each item found in orders
+        // Estimated Cost of Goods (assuming 30% food cost for simplicity if not tracked perfectly yet)
+        // In a real scenario, we'd sum up ingredient costs from recipes. 
+        // For now, let's use a rough estimate or if we have cost in menu_items, use that.
+        let totalCostOfGoods = 0;
         orders.forEach(order => {
             order.order_items.forEach(item => {
-                const menuId = item.menu_items?.id;
-                if (menuId && itemCosts[menuId] === undefined) {
-                    const itemRecipes = recipeMap[menuId] || [];
-                    const cost = itemRecipes.reduce((sum, r) => {
-                        const yieldDecimal = (r.ingredients.yield_percent || 100) / 100;
-                        const realCost = yieldDecimal > 0 ? (r.ingredients.purchase_price / yieldDecimal) : 0;
-                        return sum + (realCost * r.quantity_required);
-                    }, 0);
-                    itemCosts[menuId] = cost;
-                }
+                // If we had cost in menu_items, we'd use it. 
+                // item.menu_items.cost would be ideal.
+                // Fallback to 30% of price if cost is missing.
+                const itemCost = item.menu_items?.cost || (item.price_at_time * 0.3);
+                totalCostOfGoods += itemCost * item.quantity;
             });
         });
 
-        // B. Calculate Aggregate Stats
-        let totalRev = 0;
-        let totalCost = 0;
-        const categoryCounts = {};
-        const hourCounts = Array(24).fill(0);
-        const itemSales = {};
-        const dailySales = {}; // { "Oct 24": 2500 }
+        const netProfit = totalRevenue - totalCostOfGoods - totalWastage;
 
+        setMetrics({
+            revenue: totalRevenue,
+            orders: totalOrders,
+            avgOrderValue,
+            wastageCost: totalWastage,
+            netProfit
+        });
+
+        // 2. Revenue Trend (Group by Day)
+        const trendMap = {};
         orders.forEach(order => {
-            totalRev += order.total_amount || 0;
+            const date = new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            trendMap[date] = (trendMap[date] || 0) + order.total_amount;
+        });
+        const trendData = Object.keys(trendMap).map(date => ({ date, revenue: trendMap[date] }));
+        setRevenueData(trendData);
 
-            // Profit & Category Logic
+        // 3. Category Sales
+        const categoryMap = {};
+        orders.forEach(order => {
             order.order_items.forEach(item => {
-                const menuId = item.menu_items?.id;
-                const qty = item.quantity;
-                const cost = (itemCosts[menuId] || 0) * qty;
-                totalCost += cost;
-
-                // Category
                 const cat = item.menu_items?.category || 'Other';
-                categoryCounts[cat] = (categoryCounts[cat] || 0) + qty;
-
-                // Top Items
-                const name = item.menu_items?.name || 'Unknown';
-                itemSales[name] = (itemSales[name] || 0) + qty;
+                categoryMap[cat] = (categoryMap[cat] || 0) + (item.price_at_time * item.quantity);
             });
-
-            // Peak Hours
-            const date = new Date(order.created_at);
-            hourCounts[date.getHours()]++;
-
-            // Sales Trend (Last 7 Days)
-            const dayStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            dailySales[dayStr] = (dailySales[dayStr] || 0) + order.total_amount;
         });
+        const catData = Object.keys(categoryMap).map(name => ({ name, value: categoryMap[name] }));
+        setCategoryData(catData);
 
-        const totalProfit = totalRev - totalCost;
-        const margin = totalRev > 0 ? (totalProfit / totalRev) * 100 : 0;
-
-        // C. Format Data for Charts
-        const salesTrend = Object.entries(dailySales)
-            .slice(0, 7) // Limit to 7 days for cleanliness
-            .map(([date, amount]) => ({ date, amount }))
-            .reverse(); // Show oldest to newest if fetched desc
-
-        const categoryData = Object.entries(categoryCounts).map(([name, value]) => ({ name, value }));
-
-        const peakHours = hourCounts.map((count, hour) => ({
-            hour: `${hour}:00`,
-            orders: count
-        })).filter(h => h.orders > 0); // Only show active hours
-
-        const topItems = Object.entries(itemSales)
+        // 4. Top Items
+        const itemMap = {};
+        orders.forEach(order => {
+            order.order_items.forEach(item => {
+                const name = item.menu_items?.name || 'Unknown';
+                itemMap[name] = (itemMap[name] || 0) + item.quantity;
+            });
+        });
+        const topData = Object.entries(itemMap)
             .sort(([, a], [, b]) => b - a)
             .slice(0, 5)
             .map(([name, count]) => ({ name, count }));
-
-        setStats({
-            totalRevenue: totalRev,
-            totalProfit,
-            margin,
-            averageOrderValue: orders.length > 0 ? totalRev / orders.length : 0,
-            topItems,
-            salesTrend,
-            categoryData,
-            peakHours
-        });
+        setTopItems(topData);
     };
 
-    const COLORS = ['#22c55e', '#eab308', '#3b82f6', '#f97316', '#a855f7'];
-
-    const toggleExpand = (id) => {
-        setExpandedOrderId(expandedOrderId === id ? null : id);
-    };
-
-    const formatDate = (dateString) => {
-        const date = new Date(dateString);
-        return new Intl.DateTimeFormat('en-US', {
-            month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true
-        }).format(date);
-    };
+    const COLORS = ['#FFD700', '#00A86B', '#FF6B6B', '#4ECDC4', '#45B7D1'];
 
     return (
-        <div className="max-w-7xl mx-auto pb-20">
-            <header className="mb-8">
-                <h1 className="text-3xl font-bold text-primary mb-2">Analytics & History</h1>
-                <p className="text-text-muted">The brain of your shop. Track performance in real-time.</p>
-            </header>
-
-            {/* Key Metrics Row */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <div className="bg-surface p-6 rounded-3xl border border-border relative overflow-hidden">
-                    <div className="text-text-muted text-sm font-bold uppercase tracking-wider mb-1">Total Revenue</div>
-                    <div className="text-3xl font-bold text-text">LKR {stats.totalRevenue.toLocaleString()}</div>
-                    <div className="absolute top-4 right-4 opacity-20 text-primary"><DollarSign size={40} /></div>
-                </div>
-                <div className="bg-surface p-6 rounded-3xl border border-border relative overflow-hidden">
-                    <div className="text-text-muted text-sm font-bold uppercase tracking-wider mb-1">Gross Profit</div>
-                    <div className="text-3xl font-bold text-secondary">LKR {stats.totalProfit.toLocaleString()}</div>
-                    <div className="absolute top-4 right-4 opacity-20 text-secondary"><TrendingUp size={40} /></div>
-                </div>
-                <div className="bg-surface p-6 rounded-3xl border border-border relative overflow-hidden">
-                    <div className="text-text-muted text-sm font-bold uppercase tracking-wider mb-1">Net Margin</div>
-                    <div className={`text-3xl font-bold ${stats.margin > 40 ? 'text-primary' : 'text-red-400'}`}>
-                        {stats.margin.toFixed(1)}%
+        <div className="h-[calc(100vh-40px)] flex flex-col gap-6 overflow-y-auto pb-20">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-surface p-6 rounded-3xl border border-border shadow-sm">
+                <div className="flex items-center gap-4">
+                    <div className="p-3 bg-primary/20 rounded-2xl text-primary">
+                        <TrendingUp size={24} />
                     </div>
-                    <div className="absolute top-4 right-4 opacity-20 text-text"><PieChartIcon size={40} /></div>
+                    <div>
+                        <h1 className="text-2xl font-bold text-text">Business Analytics</h1>
+                        <p className="text-text-muted text-sm">Real-time performance insights</p>
+                    </div>
                 </div>
-                <div className="bg-surface p-6 rounded-3xl border border-border relative overflow-hidden">
-                    <div className="text-text-muted text-sm font-bold uppercase tracking-wider mb-1">Avg. Order</div>
-                    <div className="text-3xl font-bold text-text">LKR {stats.averageOrderValue.toFixed(0)}</div>
-                    <div className="absolute top-4 right-4 opacity-20 text-text"><BarChartIcon size={40} /></div>
+                <div className="flex bg-bg p-1 rounded-xl border border-border">
+                    {['today', 'week', 'month'].map(range => (
+                        <button
+                            key={range}
+                            onClick={() => setTimeRange(range)}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold capitalize transition-colors ${timeRange === range ? 'bg-primary text-bg' : 'text-text-muted hover:text-text'
+                                }`}
+                        >
+                            {range}
+                        </button>
+                    ))}
                 </div>
             </div>
 
+            {/* Metrics Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <MetricCard
+                    title="Total Revenue"
+                    value={`LKR ${metrics.revenue.toLocaleString()}`}
+                    icon={DollarSign}
+                    color="text-primary"
+                    bg="bg-primary/10"
+                />
+                <MetricCard
+                    title="Net Profit"
+                    value={`LKR ${metrics.netProfit.toLocaleString()}`}
+                    sub={`Margin: ${metrics.revenue > 0 ? ((metrics.netProfit / metrics.revenue) * 100).toFixed(1) : 0}%`}
+                    icon={TrendingUp}
+                    color="text-green-400"
+                    bg="bg-green-400/10"
+                />
+                <MetricCard
+                    title="Total Orders"
+                    value={metrics.orders}
+                    sub={`Avg: LKR ${metrics.avgOrderValue.toFixed(0)}`}
+                    icon={ShoppingBag}
+                    color="text-blue-400"
+                    bg="bg-blue-400/10"
+                />
+                <MetricCard
+                    title="Wastage Cost"
+                    value={`LKR ${metrics.wastageCost.toLocaleString()}`}
+                    icon={AlertTriangle}
+                    color="text-red-400"
+                    bg="bg-red-400/10"
+                />
+            </div>
+
             {/* Charts Row 1 */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                {/* Sales Trend */}
-                <div className="md:col-span-2 bg-surface p-6 rounded-3xl border border-border">
-                    <h3 className="text-lg font-bold text-text mb-6">Revenue Trend (Last 7 Days)</h3>
-                    <div className="h-64 w-full">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Revenue Trend */}
+                <div className="lg:col-span-2 bg-surface p-6 rounded-3xl border border-border shadow-sm">
+                    <h3 className="text-lg font-bold text-text mb-6">Revenue Trend</h3>
+                    <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={stats.salesTrend}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#1f4b3f" />
-                                <XAxis dataKey="date" stroke="#86efac" tick={{ fill: '#86efac' }} />
-                                <YAxis stroke="#86efac" tick={{ fill: '#86efac' }} />
+                            <AreaChart data={revenueData}>
+                                <defs>
+                                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#FFD700" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#FFD700" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                                <XAxis dataKey="date" stroke="#666" tick={{ fill: '#888' }} />
+                                <YAxis stroke="#666" tick={{ fill: '#888' }} />
                                 <Tooltip
-                                    contentStyle={{ backgroundColor: '#0d231e', borderColor: '#1f4b3f', color: '#f0fdf4' }}
-                                    itemStyle={{ color: '#22c55e' }}
+                                    contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '12px' }}
+                                    itemStyle={{ color: '#fff' }}
                                 />
-                                <Line type="monotone" dataKey="amount" stroke="#22c55e" strokeWidth={3} dot={{ fill: '#22c55e' }} />
-                            </LineChart>
+                                <Area type="monotone" dataKey="revenue" stroke="#FFD700" fillOpacity={1} fill="url(#colorRevenue)" />
+                            </AreaChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
-                {/* Category Breakdown */}
-                <div className="bg-surface p-6 rounded-3xl border border-border">
+                {/* Sales by Category */}
+                <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm">
                     <h3 className="text-lg font-bold text-text mb-6">Sales by Category</h3>
-                    <div className="h-64 w-full">
+                    <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie
-                                    data={stats.categoryData}
+                                    data={categoryData}
                                     cx="50%"
                                     cy="50%"
                                     innerRadius={60}
-                                    outerRadius={80}
+                                    outerRadius={100}
                                     paddingAngle={5}
                                     dataKey="value"
                                 >
-                                    {stats.categoryData.map((entry, index) => (
+                                    {categoryData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                     ))}
                                 </Pie>
-                                <Tooltip contentStyle={{ backgroundColor: '#0d231e', borderColor: '#1f4b3f', color: '#f0fdf4' }} />
+                                <Tooltip
+                                    contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '12px' }}
+                                    itemStyle={{ color: '#fff' }}
+                                />
+                                <Legend />
                             </PieChart>
                         </ResponsiveContainer>
-                        <div className="flex flex-wrap justify-center gap-4 mt-4">
-                            {stats.categoryData.map((entry, index) => (
-                                <div key={entry.name} className="flex items-center gap-2 text-xs text-text-muted">
-                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                                    {entry.name}
-                                </div>
-                            ))}
-                        </div>
                     </div>
                 </div>
             </div>
 
             {/* Charts Row 2 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                {/* Peak Hours */}
-                <div className="bg-surface p-6 rounded-3xl border border-border">
-                    <h3 className="text-lg font-bold text-text mb-6">Peak Hours</h3>
-                    <div className="h-64 w-full">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Top Selling Items */}
+                <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm">
+                    <h3 className="text-lg font-bold text-text mb-6">Top Selling Items</h3>
+                    <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={stats.peakHours}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#1f4b3f" vertical={false} />
-                                <XAxis dataKey="hour" stroke="#86efac" tick={{ fill: '#86efac' }} />
-                                <YAxis stroke="#86efac" tick={{ fill: '#86efac' }} />
-                                <Tooltip cursor={{ fill: '#14332c' }} contentStyle={{ backgroundColor: '#0d231e', borderColor: '#1f4b3f', color: '#f0fdf4' }} />
-                                <Bar dataKey="orders" fill="#eab308" radius={[4, 4, 0, 0]} />
+                            <BarChart data={topItems} layout="vertical">
+                                <CartesianGrid strokeDasharray="3 3" stroke="#333" horizontal={false} />
+                                <XAxis type="number" stroke="#666" />
+                                <YAxis dataKey="name" type="category" width={100} stroke="#888" />
+                                <Tooltip
+                                    cursor={{ fill: '#333' }}
+                                    contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '12px' }}
+                                />
+                                <Bar dataKey="count" fill="#4ECDC4" radius={[0, 4, 4, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
-
-                {/* Top Items List */}
-                <div className="bg-surface p-6 rounded-3xl border border-border">
-                    <h3 className="text-lg font-bold text-text mb-6">Top Selling Items</h3>
-                    <div className="space-y-4">
-                        {stats.topItems.map((item, index) => (
-                            <div key={item.name} className="flex items-center justify-between p-3 bg-bg rounded-xl border border-border">
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${index === 0 ? 'bg-secondary text-bg' : 'bg-surface-hover text-text-muted'}`}>
-                                        {index + 1}
-                                    </div>
-                                    <span className="font-medium text-text">{item.name}</span>
-                                </div>
-                                <span className="text-primary font-bold">{item.count} sold</span>
-                            </div>
-                        ))}
-                        {stats.topItems.length === 0 && <div className="text-text-muted text-center py-10">No sales data yet</div>}
-                    </div>
-                </div>
-            </div>
-
-            <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-text">Recent Orders</h2>
-                <div className="bg-surface p-2 rounded-xl border border-border flex items-center gap-2 text-sm font-bold text-text-muted">
-                    <Clock size={16} />
-                    Latest First
-                </div>
-            </div>
-
-            <div className="space-y-4">
-                {orders.map(order => (
-                    <div key={order.id} className="bg-surface border border-border rounded-2xl overflow-hidden transition-all">
-                        {/* Header Row */}
-                        <div
-                            onClick={() => toggleExpand(order.id)}
-                            className="p-4 flex items-center justify-between cursor-pointer hover:bg-surface-hover transition-colors"
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className="bg-bg p-3 rounded-xl">
-                                    <Clock size={20} className="text-primary" />
-                                </div>
-                                <div>
-                                    <div className="font-bold text-text">Order #{order.id.slice(0, 8)}</div>
-                                    <div className="text-xs text-text-muted">{formatDate(order.created_at)}</div>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-6">
-                                <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${order.status === 'completed' ? 'bg-secondary/20 text-secondary' : 'bg-text-muted/20 text-text-muted'
-                                    }`}>
-                                    {order.status}
-                                </div>
-                                <div className="text-right">
-                                    <div className="font-bold text-lg text-text">LKR {order.total_amount}</div>
-                                </div>
-                                {expandedOrderId === order.id ? <ChevronUp size={20} className="text-text-muted" /> : <ChevronDown size={20} className="text-text-muted" />}
-                            </div>
-                        </div>
-
-                        {/* Expanded Details */}
-                        {expandedOrderId === order.id && (
-                            <div className="bg-bg/50 border-t border-border p-4">
-                                <div className="mb-4">
-                                    <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Items</h4>
-                                    <div className="space-y-2">
-                                        {order.order_items?.map(item => (
-                                            <div key={item.id} className="flex justify-between text-sm">
-                                                <span className="text-text">
-                                                    <span className="font-bold text-primary">{item.quantity}x</span> {item.menu_items?.name || 'Unknown Item'}
-                                                </span>
-                                                <span className="text-text-muted">LKR {item.price_at_time * item.quantity}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="flex justify-end pt-4 border-t border-border">
-                                    <button className="flex items-center gap-2 text-text-muted hover:text-text transition-colors text-sm font-bold">
-                                        <Printer size={16} />
-                                        Reprint Receipt
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                ))}
             </div>
         </div>
     );
 };
+
+const MetricCard = ({ title, value, sub, icon: Icon, color, bg }) => (
+    <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm hover:border-primary/30 transition-colors">
+        <div className="flex justify-between items-start mb-4">
+            <div className={`p-3 rounded-2xl ${bg} ${color}`}>
+                <Icon size={24} />
+            </div>
+            {sub && <span className="text-xs font-bold text-text-muted bg-bg px-2 py-1 rounded-lg">{sub}</span>}
+        </div>
+        <h3 className="text-text-muted text-sm font-medium mb-1">{title}</h3>
+        <p className="text-2xl font-bold text-text">{value}</p>
+    </div>
+);
 
 export default Analytics;

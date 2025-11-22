@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Package, AlertTriangle, Save, Plus, Search, X, Check, Edit2 } from 'lucide-react';
+import { Package, AlertTriangle, Save, Plus, Search, X, Check, Edit2, Trash2 } from 'lucide-react';
 
 const Inventory = () => {
     const [ingredients, setIngredients] = useState([]);
@@ -17,6 +17,11 @@ const Inventory = () => {
         purchase_price: 0,
         yield_percent: 100
     });
+
+    // Wastage State
+    const [isWastageModalOpen, setIsWastageModalOpen] = useState(false);
+    const [selectedForWastage, setSelectedForWastage] = useState(null);
+    const [wastageData, setWastageData] = useState({ quantity: '', reason: '' });
 
     useEffect(() => {
         fetchInventory();
@@ -83,6 +88,45 @@ const Inventory = () => {
                 purchase_price: 0,
                 yield_percent: 100
             });
+            fetchInventory();
+        }
+    };
+
+    const openWastageModal = (item) => {
+        setSelectedForWastage(item);
+        setWastageData({ quantity: '', reason: '' });
+        setIsWastageModalOpen(true);
+    };
+
+    const handleReportWastage = async () => {
+        if (!selectedForWastage || !wastageData.quantity) return;
+
+        const quantity = parseFloat(wastageData.quantity);
+        const costAtTime = (selectedForWastage.purchase_price / (selectedForWastage.yield_percent / 100)) * quantity;
+
+        // 1. Log Wastage
+        const { error: logError } = await supabase
+            .from('wastage_logs')
+            .insert([{
+                ingredient_id: selectedForWastage.id,
+                quantity: quantity,
+                reason: wastageData.reason,
+                cost_at_time: costAtTime
+            }]);
+
+        if (logError) {
+            alert('Error logging wastage');
+            return;
+        }
+
+        // 2. Deduct Stock
+        const { error: updateError } = await supabase
+            .from('ingredients')
+            .update({ current_stock: selectedForWastage.current_stock - quantity })
+            .eq('id', selectedForWastage.id);
+
+        if (!updateError) {
+            setIsWastageModalOpen(false);
             fetchInventory();
         }
     };
@@ -244,12 +288,22 @@ const Inventory = () => {
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <button
-                                                    onClick={() => startEditing(item)}
-                                                    className="p-2 text-text-muted hover:text-primary hover:bg-primary/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                                                >
-                                                    <Edit2 size={18} />
-                                                </button>
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={() => openWastageModal(item)}
+                                                        className="p-2 text-text-muted hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                        title="Report Wastage"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => startEditing(item)}
+                                                        className="p-2 text-text-muted hover:text-primary hover:bg-primary/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                        title="Edit Ingredient"
+                                                    >
+                                                        <Edit2 size={18} />
+                                                    </button>
+                                                </div>
                                             )}
                                         </td>
                                     </tr>
@@ -345,6 +399,69 @@ const Inventory = () => {
                                 className="w-full py-4 bg-primary text-bg font-bold rounded-xl hover:opacity-90 transition-opacity mt-4"
                             >
                                 Create Ingredient
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Wastage Modal */}
+            {isWastageModalOpen && selectedForWastage && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-surface border border-border rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <h2 className="text-2xl font-bold text-text">Report Wastage</h2>
+                                <p className="text-text-muted text-sm">{selectedForWastage.name}</p>
+                            </div>
+                            <button onClick={() => setIsWastageModalOpen(false)} className="p-2 hover:bg-surface-hover rounded-full text-text-muted">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-text-muted text-sm font-bold mb-1">Quantity Wasted ({selectedForWastage.unit})</label>
+                                <input
+                                    type="number"
+                                    value={wastageData.quantity}
+                                    onChange={e => setWastageData({ ...wastageData, quantity: e.target.value })}
+                                    className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
+                                    placeholder="0.00"
+                                    autoFocus
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-text-muted text-sm font-bold mb-1">Reason</label>
+                                <select
+                                    value={wastageData.reason}
+                                    onChange={e => setWastageData({ ...wastageData, reason: e.target.value })}
+                                    className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
+                                >
+                                    <option value="">Select reason...</option>
+                                    <option value="Spoiled">Spoiled / Expired</option>
+                                    <option value="Spilled">Spilled / Dropped</option>
+                                    <option value="Overcooked">Overcooked / Burnt</option>
+                                    <option value="Customer Return">Customer Return</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+
+                            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3">
+                                <AlertTriangle className="text-red-400 shrink-0" size={20} />
+                                <div>
+                                    <p className="text-red-400 font-bold text-sm">This will reduce stock!</p>
+                                    <p className="text-red-400/80 text-xs mt-1">
+                                        Estimated Loss: LKR {wastageData.quantity ? ((selectedForWastage.purchase_price / (selectedForWastage.yield_percent / 100)) * parseFloat(wastageData.quantity)).toFixed(2) : '0.00'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={handleReportWastage}
+                                className="w-full py-4 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-colors mt-4"
+                            >
+                                Confirm Wastage
                             </button>
                         </div>
                     </div>
