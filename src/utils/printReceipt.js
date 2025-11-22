@@ -1,6 +1,12 @@
 export const printReceipt = (order, items) => {
     const receiptWindow = window.open('', '_blank', 'width=300,height=600');
 
+    if (!receiptWindow) {
+        console.warn('Receipt popup blocked');
+        alert('Please allow popups to print receipts');
+        return;
+    }
+
     const date = new Date().toLocaleString();
     const total = order.total_amount.toLocaleString();
 
