@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/authStore';
 
 const Layout = () => {
     const { profile, signOut } = useAuthStore();
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
     // Define all items with their required roles
     const allNavItems = [
@@ -22,19 +23,19 @@ const Layout = () => {
         profile?.role && item.roles.includes(profile.role)
     );
 
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
-
     return (
         <div className="flex h-screen w-screen overflow-hidden bg-bg text-text font-sans flex-col md:flex-row">
             {/* Mobile Header */}
-            <div className="md:hidden flex items-center justify-between p-4 bg-surface border-b border-border z-30">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">K</div>
-                    <span className="font-bold text-lg">Kadé</span>
+            <div className="md:hidden flex items-center justify-between p-4 bg-surface border-b border-border z-30 sticky top-0">
+                <div className="flex items-center gap-3">
+                    <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 -ml-2 text-text hover:bg-surface-hover rounded-lg transition-colors">
+                        {isMobileMenuOpen ? <LogOut className="rotate-180" /> : <Menu />}
+                    </button>
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">K</div>
+                        <span className="font-bold text-lg">Kadé</span>
+                    </div>
                 </div>
-                <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-text">
-                    {isMobileMenuOpen ? <LogOut className="rotate-180" /> : <Menu />}
-                </button>
             </div>
 
             {/* Sidebar */}
@@ -104,14 +105,12 @@ const Layout = () => {
             </aside>
 
             {/* Overlay for mobile */}
-            {
-                isMobileMenuOpen && (
-                    <div
-                        className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                    />
-                )
-            }
+            {isMobileMenuOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                />
+            )}
 
             {/* Main Content */}
             <main className="flex-1 overflow-y-auto p-4 md:p-6 relative w-full">
@@ -123,7 +122,7 @@ const Layout = () => {
                     <Outlet />
                 </div>
             </main>
-        </div >
+        </div>
     );
 };
 
