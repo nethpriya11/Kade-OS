@@ -19,6 +19,16 @@ const Analytics = () => {
 
     useEffect(() => {
         fetchAnalytics();
+
+        const subscription = supabase
+            .channel('analytics_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchAnalytics)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'wastage_logs' }, fetchAnalytics)
+            .subscribe();
+
+        return () => {
+            subscription.unsubscribe();
+        };
     }, [timeRange]);
 
     const fetchAnalytics = async () => {
