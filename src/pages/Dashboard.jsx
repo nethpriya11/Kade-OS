@@ -35,15 +35,16 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
 
     const fetchStats = async () => {
-        // Use local date for "Today"
+        // Get start of today in local time, then convert to UTC ISO string
         const now = new Date();
-        const localDate = now.toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
+        now.setHours(0, 0, 0, 0);
+        const startOfDay = now.toISOString();
 
         // Fetch Orders for today
         const { data: orders, error: ordersError } = await supabase
             .from('orders')
             .select('total_amount')
-            .gte('created_at', `${localDate}T00:00:00`)
+            .gte('created_at', startOfDay)
             .eq('status', 'completed');
 
         // Fetch Low Stock Items

@@ -22,9 +22,17 @@ const Analytics = () => {
 
         const subscription = supabase
             .channel('analytics_changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchAnalytics)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'wastage_logs' }, fetchAnalytics)
-            .subscribe();
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+                console.log('Realtime Order Update:', payload);
+                fetchAnalytics();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'wastage_logs' }, (payload) => {
+                console.log('Realtime Wastage Update:', payload);
+                fetchAnalytics();
+            })
+            .subscribe((status) => {
+                console.log('Analytics Subscription Status:', status);
+            });
 
         return () => {
             subscription.unsubscribe();
