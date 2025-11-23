@@ -6,7 +6,7 @@ const Inventory = () => {
     const [ingredients, setIngredients] = useState([]);
     const [loading, setLoading] = useState(true);
     const [editingId, setEditingId] = useState(null);
-    const [editValues, setEditValues] = useState({ stock: '', price: '', yield: '' });
+    const [editValues, setEditValues] = useState({ stock: '', price: '', yield: '', threshold: '' });
     const [isCreating, setIsCreating] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [newIngredient, setNewIngredient] = useState({
@@ -51,7 +51,8 @@ const Inventory = () => {
         setEditValues({
             stock: item.current_stock,
             price: item.purchase_price || 0,
-            yield: item.yield_percent || 100
+            yield: item.yield_percent || 100,
+            threshold: item.low_stock_threshold || 5
         });
     };
 
@@ -61,7 +62,8 @@ const Inventory = () => {
             .update({
                 current_stock: editValues.stock,
                 purchase_price: editValues.price,
-                yield_percent: editValues.yield
+                yield_percent: editValues.yield,
+                low_stock_threshold: editValues.threshold
             })
             .eq('id', id);
 
@@ -179,6 +181,7 @@ const Inventory = () => {
                             <tr>
                                 <th className="p-4 font-bold text-text-muted uppercase text-xs tracking-wider">Ingredient</th>
                                 <th className="p-4 font-bold text-text-muted uppercase text-xs tracking-wider">Stock Level</th>
+                                <th className="p-4 font-bold text-text-muted uppercase text-xs tracking-wider">Min Stock</th>
                                 <th className="p-4 font-bold text-text-muted uppercase text-xs tracking-wider">Purchase Price</th>
                                 <th className="p-4 font-bold text-text-muted uppercase text-xs tracking-wider">Yield %</th>
                                 <th className="p-4 font-bold text-text-muted uppercase text-xs tracking-wider">Real Cost / Unit</th>
@@ -222,6 +225,20 @@ const Inventory = () => {
                                                         </div>
                                                     )}
                                                 </div>
+                                            )}
+                                        </td>
+
+                                        {/* Min Stock Level */}
+                                        <td className="p-4">
+                                            {isEditing ? (
+                                                <input
+                                                    type="number"
+                                                    value={editValues.threshold}
+                                                    onChange={(e) => setEditValues({ ...editValues, threshold: e.target.value })}
+                                                    className="bg-bg border border-primary rounded-lg px-3 py-2 w-20 text-text focus:outline-none font-bold"
+                                                />
+                                            ) : (
+                                                <span className="text-text-muted font-medium">{item.low_stock_threshold}</span>
                                             )}
                                         </td>
 
@@ -291,14 +308,14 @@ const Inventory = () => {
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button
                                                         onClick={() => openWastageModal(item)}
-                                                        className="p-2 text-text-muted hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                        className="p-2 text-text-muted hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100"
                                                         title="Report Wastage"
                                                     >
                                                         <Trash2 size={18} />
                                                     </button>
                                                     <button
                                                         onClick={() => startEditing(item)}
-                                                        className="p-2 text-text-muted hover:text-primary hover:bg-primary/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                        className="p-2 text-text-muted hover:text-primary hover:bg-primary/10 rounded-lg transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100"
                                                         title="Edit Ingredient"
                                                     >
                                                         <Edit2 size={18} />
