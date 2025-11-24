@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { predictCategory } from '../lib/gemini';
-import { Package, AlertTriangle, Save, Plus, Search, X, Check, Edit2, Trash2, MinusCircle, Sparkles } from 'lucide-react';
+import { useInventoryStore } from '../store/inventoryStore';
+import { Package, AlertTriangle, Save, Plus, Search, X, Check, Edit2, Trash2, MinusCircle, Sparkles, History } from 'lucide-react';
 
 const DEFAULT_CATEGORIES = ['Produce', 'Meat', 'Spices', 'Dairy', 'Dry Goods', 'Bakery', 'Other'];
 
 const Inventory = () => {
-    const [ingredients, setIngredients] = useState([]);
-    const [loading, setLoading] = useState(true);
+    // Global Store
+    const { ingredients, logs: historyLogs, loading } = useInventoryStore();
+
     const [editingId, setEditingId] = useState(null);
     const [editValues, setEditValues] = useState({ stock: '', price: '', yield: '', threshold: '', category: '' });
     const [isCreating, setIsCreating] = useState(false);
@@ -35,6 +37,9 @@ const Inventory = () => {
     // AI Prediction State
     const [isPredicting, setIsPredicting] = useState(false);
 
+    // History State
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
     // Derived Categories
     const allCategories = Array.from(new Set([...DEFAULT_CATEGORIES, ...ingredients.map(i => i.category || 'Other')]));
 
@@ -54,28 +59,8 @@ const Inventory = () => {
         return () => clearTimeout(timer);
     }, [newIngredient.name, isCreating]);
 
-    useEffect(() => {
-        fetchInventory();
-
-        const subscription = supabase
-            .channel('inventory_changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'ingredients' }, fetchInventory)
-            .subscribe();
-
-        return () => {
-            subscription.unsubscribe();
-        };
-    }, []);
-
-    const fetchInventory = async () => {
-        const { data, error } = await supabase
-            .from('ingredients')
-            .select('*')
-            .order('name', { ascending: true });
-
-        if (data) setIngredients(data);
-        setLoading(false);
-    };
+    // NOTE: Real-time updates are now handled by RealtimeManager in App.jsx
+    // We don't need local subscriptions or fetch calls here anymore.
 
     const startEditing = (item) => {
         setEditingId(item.id);
@@ -104,7 +89,7 @@ const Inventory = () => {
             if (error) throw error;
 
             setEditingId(null);
-            fetchInventory();
+            // Store updates automatically via RealtimeManager
         } catch (error) {
             console.error('Error updating ingredient:', error);
             alert(`Failed to update ingredient: ${error.message}`);
@@ -131,7 +116,7 @@ const Inventory = () => {
                 purchase_price: 0,
                 yield_percent: 100
             });
-            fetchInventory();
+            // Store updates automatically via RealtimeManager
         } catch (error) {
             console.error('Error creating ingredient:', error);
             alert(`Failed to create ingredient: ${error.message}`);
@@ -172,7 +157,7 @@ const Inventory = () => {
             if (updateError) throw updateError;
 
             setIsWastageModalOpen(false);
-            fetchInventory();
+            // Store updates automatically via RealtimeManager
         } catch (error) {
             console.error('Error reporting wastage:', error);
             alert(`Failed to report wastage: ${error.message}`);
@@ -189,7 +174,7 @@ const Inventory = () => {
 
                 if (error) throw error;
 
-                fetchInventory();
+                // Store updates automatically via RealtimeManager
             } catch (error) {
                 console.error('Error deleting ingredient:', error);
                 alert(`Failed to delete ingredient: ${error.message}`);
@@ -214,6 +199,20 @@ const Inventory = () => {
         const newPrice = restockData.price ? parseFloat(restockData.price) : selectedForRestock.purchase_price;
 
         try {
+            // 1. Log Restock
+            const totalCost = quantity * newPrice;
+            const { error: logError } = await supabase
+                .from('restock_logs')
+                .insert([{
+                    ingredient_id: selectedForRestock.id,
+                    quantity: quantity,
+                    cost_per_unit: newPrice,
+                    total_cost: totalCost
+                }]);
+
+            if (logError) throw logError;
+
+            // 2. Update Stock
             const { error } = await supabase
                 .from('ingredients')
                 .update({
@@ -225,11 +224,15 @@ const Inventory = () => {
             if (error) throw error;
 
             setIsRestockModalOpen(false);
-            fetchInventory();
+            // Store updates automatically via RealtimeManager
         } catch (error) {
             console.error('Error restocking:', error);
             alert(`Failed to restock: ${error.message}`);
         }
+    };
+
+    const openHistory = () => {
+        setIsHistoryOpen(true);
     };
 
     const [categoryFilter, setCategoryFilter] = useState('All');
@@ -294,6 +297,13 @@ const Inventory = () => {
                                     className="w-full bg-bg border border-border rounded-xl pl-10 pr-4 py-3 text-text focus:border-primary focus:outline-none"
                                 />
                             </div>
+                            <button
+                                onClick={openHistory}
+                                className="flex items-center justify-center gap-2 bg-surface hover:bg-surface-hover text-text border border-border px-4 py-3 rounded-xl transition-colors"
+                                title="Restock History"
+                            >
+                                <History size={20} />
+                            </button>
                             <button
                                 onClick={() => setIsCreating(true)}
                                 className="flex items-center justify-center gap-2 bg-primary text-bg font-bold px-6 py-3 rounded-xl hover:opacity-90 transition-opacity"
@@ -619,6 +629,55 @@ const Inventory = () => {
                             >
                                 Confirm Purchase
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* History Modal */}
+            {isHistoryOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-surface border border-border rounded-3xl p-6 w-full max-w-2xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[80vh]">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-bold text-text">Restock History</h2>
+                            <button onClick={() => setIsHistoryOpen(false)} className="p-2 hover:bg-surface-hover rounded-full text-text-muted">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="overflow-y-auto flex-1 -mx-2 px-2">
+                            {historyLogs.length === 0 ? (
+                                <div className="text-center py-10 text-text-muted">No history found.</div>
+                            ) : (
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="text-text-muted text-sm border-b border-border">
+                                            <th className="pb-3 pl-2 font-bold">Date</th>
+                                            <th className="pb-3 font-bold">Item</th>
+                                            <th className="pb-3 font-bold">Qty</th>
+                                            <th className="pb-3 font-bold text-right pr-2">Total Cost</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {historyLogs.map(log => (
+                                            <tr key={log.id} className="border-b border-border/50 last:border-0 hover:bg-surface-hover/50 transition-colors">
+                                                <td className="py-3 pl-2 text-text-muted text-sm">
+                                                    {new Date(log.created_at).toLocaleDateString()} <span className="opacity-50 text-xs">{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                </td>
+                                                <td className="py-3 text-text font-medium">
+                                                    {log.ingredients?.name || 'Unknown'}
+                                                </td>
+                                                <td className="py-3 text-text">
+                                                    +{log.quantity} {log.ingredients?.unit}
+                                                </td>
+                                                <td className="py-3 text-right pr-2 text-text font-bold">
+                                                    LKR {log.total_cost.toLocaleString()}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
                         </div>
                     </div>
                 </div>

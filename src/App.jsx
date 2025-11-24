@@ -19,12 +19,14 @@ import { Toaster } from 'sonner';
 
 import SyncManager from './components/SyncManager';
 import Calculator from './components/Calculator';
+import RealtimeManager from './components/RealtimeManager';
 
 function App() {
   return (
     <Router>
       <Toaster position="top-center" richColors theme="dark" />
       <SyncManager />
+      <RealtimeManager />
       <Calculator />
       <Routes>
         <Route path="/login" element={<Login />} />

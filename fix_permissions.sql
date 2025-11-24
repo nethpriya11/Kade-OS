@@ -1,12 +1,14 @@
--- Disable RLS on all tables to allow the app to read/write freely
--- (Since this is a solo app, this is acceptable for the MVP)
+-- Grant table permissions to standard Supabase roles
+GRANT ALL ON public.restock_logs TO anon;
+GRANT ALL ON public.restock_logs TO authenticated;
+GRANT ALL ON public.restock_logs TO service_role;
 
-alter table public.menu_items disable row level security;
-alter table public.ingredients disable row level security;
-alter table public.recipes disable row level security;
-alter table public.orders disable row level security;
-alter table public.order_items disable row level security;
+-- Ensure RLS is enabled
+ALTER TABLE public.restock_logs ENABLE ROW LEVEL SECURITY;
 
--- Verify permissions
-grant all on all tables in schema public to anon;
-grant all on all sequences in schema public to anon;
+-- Re-apply policies to ensure access
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.restock_logs;
+CREATE POLICY "Enable read access for all users" ON public.restock_logs FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Enable insert access for all users" ON public.restock_logs;
+CREATE POLICY "Enable insert access for all users" ON public.restock_logs FOR INSERT WITH CHECK (true);
