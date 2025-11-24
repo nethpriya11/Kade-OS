@@ -102,11 +102,20 @@ const Inventory = () => {
         setIsSubmitting(true);
 
         try {
-            const { data, error } = await supabase
-                .from('ingredients')
-                .insert([newIngredient])
-                .select()
-                .single();
+            // Create a promise that rejects after 10 seconds
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Request timed out. Please check your connection.')), 10000)
+            );
+
+            // Race the Supabase request against the timeout
+            const { data, error } = await Promise.race([
+                supabase
+                    .from('ingredients')
+                    .insert([newIngredient])
+                    .select()
+                    .single(),
+                timeoutPromise
+            ]);
 
             if (error) throw error;
 
