@@ -18,12 +18,14 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { Toaster } from 'sonner';
 
 import SyncManager from './components/SyncManager';
+import Calculator from './components/Calculator';
 
 function App() {
   return (
     <Router>
       <Toaster position="top-center" richColors theme="dark" />
       <SyncManager />
+      <Calculator />
       <Routes>
         <Route path="/login" element={<Login />} />
 
