@@ -35,7 +35,7 @@ const Inventory = () => {
     const [isRestockModalOpen, setIsRestockModalOpen] = useState(false);
     const [isRestocking, setIsRestocking] = useState(false);
     const [selectedForRestock, setSelectedForRestock] = useState(null);
-    const [restockData, setRestockData] = useState({ quantity: '', price: '' });
+    const [restockData, setRestockData] = useState({ quantity: '', price: '', totalCost: '' });
 
     // AI Prediction State
     const [isPredicting, setIsPredicting] = useState(false);
@@ -99,8 +99,16 @@ const Inventory = () => {
 
             if (error) throw error;
 
+            // Optimistic Update
+            useInventoryStore.getState().updateIngredient(id, {
+                current_stock: editValues.stock,
+                purchase_price: editValues.price,
+                yield_percent: editValues.yield,
+                low_stock_threshold: editValues.threshold,
+                category: editValues.category
+            });
+
             setEditingId(null);
-            // Store updates automatically via RealtimeManager
         } catch (error) {
             console.error('Error updating ingredient:', error);
             alert(`Failed to update ingredient: ${error.message}`);
@@ -192,8 +200,12 @@ const Inventory = () => {
 
             if (updateError) throw updateError;
 
+            // Optimistic Update
+            useInventoryStore.getState().updateIngredient(selectedForWastage.id, {
+                current_stock: selectedForWastage.current_stock - quantity
+            });
+
             setIsWastageModalOpen(false);
-            // Store updates automatically via RealtimeManager
         } catch (error) {
             console.error('Error reporting wastage:', error);
             alert(`Failed to report wastage: ${error.message}`);
@@ -220,7 +232,8 @@ const Inventory = () => {
 
                 if (error) throw error;
 
-                // Store updates automatically via RealtimeManager
+                // Optimistic Update
+                useInventoryStore.getState().deleteIngredient(id);
             } catch (error) {
                 console.error('Error deleting ingredient:', error);
                 alert(`Failed to delete ingredient: ${error.message}`);
@@ -230,8 +243,38 @@ const Inventory = () => {
 
     const openRestockModal = (item) => {
         setSelectedForRestock(item);
-        setRestockData({ quantity: '', price: item.purchase_price || '' });
+        setRestockData({ quantity: '', price: item.purchase_price || '', totalCost: '' });
         setIsRestockModalOpen(true);
+    };
+
+    const handleRestockChange = (field, value) => {
+        let newData = { ...restockData, [field]: value };
+
+        if (field === 'quantity') {
+            const qty = parseFloat(value);
+            const price = parseFloat(newData.price);
+            if (!isNaN(qty) && !isNaN(price)) {
+                newData.totalCost = (qty * price).toFixed(2);
+            } else {
+                newData.totalCost = '';
+            }
+        } else if (field === 'price') {
+            const price = parseFloat(value);
+            const qty = parseFloat(newData.quantity);
+            if (!isNaN(qty) && !isNaN(price)) {
+                newData.totalCost = (qty * price).toFixed(2);
+            } else {
+                newData.totalCost = '';
+            }
+        } else if (field === 'totalCost') {
+            const total = parseFloat(value);
+            const qty = parseFloat(newData.quantity);
+            if (!isNaN(total) && !isNaN(qty) && qty > 0) {
+                newData.price = (total / qty).toFixed(2);
+            }
+        }
+
+        setRestockData(newData);
     };
 
     const handleRestock = async () => {
@@ -279,8 +322,13 @@ const Inventory = () => {
 
             if (error) throw error;
 
+            // Optimistic Update
+            useInventoryStore.getState().updateIngredient(selectedForRestock.id, {
+                current_stock: currentStock + quantity,
+                purchase_price: newPrice
+            });
+
             setIsRestockModalOpen(false);
-            // Store updates automatically via RealtimeManager
         } catch (error) {
             console.error('Error restocking:', error);
             alert(`Failed to restock: ${error.message}`);
@@ -310,8 +358,7 @@ const Inventory = () => {
     const totalItems = ingredients.length;
     const lowStockItems = ingredients.filter(i => i.current_stock <= i.low_stock_threshold).length;
     const totalValue = ingredients.reduce((sum, item) => {
-        const costPerUnit = item.yield_percent > 0 ? (item.purchase_price / (item.yield_percent / 100)) : 0;
-        return sum + (costPerUnit * item.current_stock);
+        return sum + (item.purchase_price * item.current_stock);
     }, 0);
 
     return (
@@ -669,22 +716,34 @@ const Inventory = () => {
                                 <input
                                     type="number"
                                     value={restockData.quantity}
-                                    onChange={e => setRestockData({ ...restockData, quantity: e.target.value })}
+                                    onChange={e => handleRestockChange('quantity', e.target.value)}
                                     className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
                                     placeholder="0.00"
                                     autoFocus
                                 />
                             </div>
-                            <div>
-                                <label className="block text-text-muted text-sm font-bold mb-1">New Purchase Price (per {selectedForRestock.unit})</label>
-                                <input
-                                    type="number"
-                                    value={restockData.price}
-                                    onChange={e => setRestockData({ ...restockData, price: e.target.value })}
-                                    className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
-                                    placeholder={selectedForRestock.purchase_price}
-                                />
-                                <p className="text-xs text-text-muted mt-1">Leave empty to keep current price: LKR {selectedForRestock.purchase_price}</p>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-text-muted text-sm font-bold mb-1">Total Cost (LKR)</label>
+                                    <input
+                                        type="number"
+                                        value={restockData.totalCost}
+                                        onChange={e => handleRestockChange('totalCost', e.target.value)}
+                                        className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
+                                        placeholder="0.00"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-text-muted text-sm font-bold mb-1">Price / {selectedForRestock.unit}</label>
+                                    <input
+                                        type="number"
+                                        value={restockData.price}
+                                        onChange={e => handleRestockChange('price', e.target.value)}
+                                        className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
+                                        placeholder={selectedForRestock.purchase_price}
+                                    />
+                                </div>
                             </div>
 
                             <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 flex items-start gap-3">
