@@ -354,7 +354,7 @@ const Inventory = () => {
                                         <span className="font-bold text-text">{item.low_stock_threshold} {item.unit}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-text-muted">Purchase Price</span>
+                                        <span className="text-text-muted">Price / {item.unit}</span>
                                         <span className="font-bold text-text">LKR {item.purchase_price}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
@@ -433,21 +433,13 @@ const Inventory = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-text-muted text-sm font-bold mb-1">Category</label>
-                                    <div className="relative">
-                                        <select
-                                            value={newIngredient.category}
-                                            onChange={e => setNewIngredient({ ...newIngredient, category: e.target.value })}
-                                            className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none appearance-none"
-                                        >
-                                            {allCategories.map(cat => (
-                                                <option key={cat} value={cat}>{cat}</option>
-                                            ))}
-                                        </select>
-                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                    <div className="w-full bg-surface-hover border border-border rounded-xl px-4 py-3 text-text flex items-center justify-between group relative">
+                                        <span className="font-medium">{newIngredient.category}</span>
+                                        <div className="flex items-center gap-2">
                                             {isPredicting ? (
                                                 <Sparkles className="text-primary animate-pulse" size={16} />
                                             ) : (
-                                                <div className="w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 border-t-text-muted" />
+                                                <span className="text-xs text-text-muted bg-bg px-2 py-1 rounded-lg border border-border">Auto</span>
                                             )}
                                         </div>
                                     </div>
@@ -490,7 +482,7 @@ const Inventory = () => {
                             </div>
 
                             <div>
-                                <label className="block text-text-muted text-sm font-bold mb-1">Purchase Price</label>
+                                <label className="block text-text-muted text-sm font-bold mb-1">Purchase Price (per {newIngredient.unit})</label>
                                 <input
                                     type="number"
                                     value={newIngredient.purchase_price}
@@ -600,7 +592,7 @@ const Inventory = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-text-muted text-sm font-bold mb-1">New Purchase Price (LKR)</label>
+                                <label className="block text-text-muted text-sm font-bold mb-1">New Purchase Price (per {selectedForRestock.unit})</label>
                                 <input
                                     type="number"
                                     value={restockData.price}
