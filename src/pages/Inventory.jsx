@@ -27,11 +27,13 @@ const Inventory = () => {
 
     // Wastage State
     const [isWastageModalOpen, setIsWastageModalOpen] = useState(false);
+    const [isWastageSubmitting, setIsWastageSubmitting] = useState(false);
     const [selectedForWastage, setSelectedForWastage] = useState(null);
     const [wastageData, setWastageData] = useState({ quantity: '', reason: '' });
 
     // Restock State
     const [isRestockModalOpen, setIsRestockModalOpen] = useState(false);
+    const [isRestocking, setIsRestocking] = useState(false);
     const [selectedForRestock, setSelectedForRestock] = useState(null);
     const [restockData, setRestockData] = useState({ quantity: '', price: '' });
 
@@ -76,16 +78,24 @@ const Inventory = () => {
 
     const handleSave = async (id) => {
         try {
-            const { error } = await supabase
-                .from('ingredients')
-                .update({
-                    current_stock: editValues.stock,
-                    purchase_price: editValues.price,
-                    yield_percent: editValues.yield,
-                    low_stock_threshold: editValues.threshold,
-                    category: editValues.category
-                })
-                .eq('id', id);
+            // Create a promise that rejects after 10 seconds
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Request timed out. Please check your connection.')), 10000)
+            );
+
+            const { error } = await Promise.race([
+                supabase
+                    .from('ingredients')
+                    .update({
+                        current_stock: editValues.stock,
+                        purchase_price: editValues.price,
+                        yield_percent: editValues.yield,
+                        low_stock_threshold: editValues.threshold,
+                        category: editValues.category
+                    })
+                    .eq('id', id),
+                timeoutPromise
+            ]);
 
             if (error) throw error;
 
@@ -148,20 +158,29 @@ const Inventory = () => {
 
     const handleReportWastage = async () => {
         if (!selectedForWastage || !wastageData.quantity) return;
+        setIsWastageSubmitting(true);
 
         const quantity = parseFloat(wastageData.quantity);
         const costAtTime = (selectedForWastage.purchase_price / (selectedForWastage.yield_percent / 100)) * quantity;
 
         try {
+            // Create a promise that rejects after 10 seconds
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Request timed out. Please check your connection.')), 10000)
+            );
+
             // 1. Log Wastage
-            const { error: logError } = await supabase
-                .from('wastage_logs')
-                .insert([{
-                    ingredient_id: selectedForWastage.id,
-                    quantity: quantity,
-                    reason: wastageData.reason,
-                    cost_at_time: costAtTime
-                }]);
+            const { error: logError } = await Promise.race([
+                supabase
+                    .from('wastage_logs')
+                    .insert([{
+                        ingredient_id: selectedForWastage.id,
+                        quantity: quantity,
+                        reason: wastageData.reason,
+                        cost_at_time: costAtTime
+                    }]),
+                timeoutPromise
+            ]);
 
             if (logError) throw logError;
 
@@ -178,16 +197,26 @@ const Inventory = () => {
         } catch (error) {
             console.error('Error reporting wastage:', error);
             alert(`Failed to report wastage: ${error.message}`);
+        } finally {
+            setIsWastageSubmitting(false);
         }
     };
 
     const handleDelete = async (id) => {
         if (confirm('Are you sure you want to delete this ingredient? This action cannot be undone.')) {
             try {
-                const { error } = await supabase
-                    .from('ingredients')
-                    .delete()
-                    .eq('id', id);
+                // Create a promise that rejects after 10 seconds
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Request timed out. Please check your connection.')), 10000)
+                );
+
+                const { error } = await Promise.race([
+                    supabase
+                        .from('ingredients')
+                        .delete()
+                        .eq('id', id),
+                    timeoutPromise
+                ]);
 
                 if (error) throw error;
 
@@ -210,22 +239,32 @@ const Inventory = () => {
             alert("Please enter a valid quantity.");
             return;
         }
+        setIsRestocking(true);
 
         const quantity = parseFloat(restockData.quantity);
         const currentStock = parseFloat(selectedForRestock.current_stock || 0);
         const newPrice = restockData.price ? parseFloat(restockData.price) : selectedForRestock.purchase_price;
 
         try {
+            // Create a promise that rejects after 10 seconds
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Request timed out. Please check your connection.')), 10000)
+            );
+
             // 1. Log Restock
             const totalCost = quantity * newPrice;
-            const { error: logError } = await supabase
-                .from('restock_logs')
-                .insert([{
-                    ingredient_id: selectedForRestock.id,
-                    quantity: quantity,
-                    cost_per_unit: newPrice,
-                    total_cost: totalCost
-                }]);
+
+            const { error: logError } = await Promise.race([
+                supabase
+                    .from('restock_logs')
+                    .insert([{
+                        ingredient_id: selectedForRestock.id,
+                        quantity: quantity,
+                        cost_per_unit: newPrice,
+                        total_cost: totalCost
+                    }]),
+                timeoutPromise
+            ]);
 
             if (logError) throw logError;
 
@@ -245,6 +284,8 @@ const Inventory = () => {
         } catch (error) {
             console.error('Error restocking:', error);
             alert(`Failed to restock: ${error.message}`);
+        } finally {
+            setIsRestocking(false);
         }
     };
 
@@ -591,9 +632,17 @@ const Inventory = () => {
 
                             <button
                                 onClick={handleReportWastage}
-                                className="w-full py-4 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-colors mt-4"
+                                disabled={isWastageSubmitting}
+                                className="w-full py-4 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-colors mt-4 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
                             >
-                                Confirm Wastage
+                                {isWastageSubmitting ? (
+                                    <>
+                                        <Sparkles className="animate-spin" size={20} />
+                                        Reporting...
+                                    </>
+                                ) : (
+                                    'Confirm Wastage'
+                                )}
                             </button>
                         </div>
                     </div>
@@ -650,9 +699,17 @@ const Inventory = () => {
 
                             <button
                                 onClick={handleRestock}
-                                className="w-full py-4 bg-green-500 text-white font-bold rounded-xl hover:bg-green-600 transition-colors mt-4"
+                                disabled={isRestocking}
+                                className="w-full py-4 bg-green-500 text-white font-bold rounded-xl hover:bg-green-600 transition-colors mt-4 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
                             >
-                                Confirm Purchase
+                                {isRestocking ? (
+                                    <>
+                                        <Sparkles className="animate-spin" size={20} />
+                                        Purchasing...
+                                    </>
+                                ) : (
+                                    'Confirm Purchase'
+                                )}
                             </button>
                         </div>
                     </div>
