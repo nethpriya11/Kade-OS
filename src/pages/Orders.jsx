@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Clock, CheckCircle, ChefHat, Bell, Volume2 } from 'lucide-react';
+import { Clock, CheckCircle, ChefHat, Bell, Volume2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Orders = () => {
@@ -157,6 +157,20 @@ const Orders = () => {
                                     </motion.button>
                                 )}
                             </div>
+                            <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm('Are you sure you want to cancel this order?')) {
+                                        updateStatus(order.id, 'cancelled');
+                                    }
+                                }}
+                                className="absolute top-4 right-4 p-2 bg-surface-hover text-text-muted hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors z-20"
+                                title="Cancel Order"
+                            >
+                                <X size={18} />
+                            </motion.button>
                         </motion.div>
                     ))}
                 </AnimatePresence>

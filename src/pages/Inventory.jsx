@@ -1,17 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Package, AlertTriangle, Save, Plus, Search, X, Check, Edit2, Trash2 } from 'lucide-react';
+import { Package, AlertTriangle, Save, Plus, Search, X, Check, Edit2, Trash2, MinusCircle } from 'lucide-react';
+
+const CATEGORIES = ['Produce', 'Meat', 'Spices', 'Dairy', 'Dry Goods', 'Bakery', 'Other'];
 
 const Inventory = () => {
     const [ingredients, setIngredients] = useState([]);
     const [loading, setLoading] = useState(true);
     const [editingId, setEditingId] = useState(null);
-    const [editValues, setEditValues] = useState({ stock: '', price: '', yield: '', threshold: '' });
+    const [editValues, setEditValues] = useState({ stock: '', price: '', yield: '', threshold: '', category: '' });
     const [isCreating, setIsCreating] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [newIngredient, setNewIngredient] = useState({
         name: '',
         unit: 'kg',
+        category: 'Produce',
         current_stock: 0,
         low_stock_threshold: 5,
         purchase_price: 0,
@@ -22,6 +25,11 @@ const Inventory = () => {
     const [isWastageModalOpen, setIsWastageModalOpen] = useState(false);
     const [selectedForWastage, setSelectedForWastage] = useState(null);
     const [wastageData, setWastageData] = useState({ quantity: '', reason: '' });
+
+    // Restock State
+    const [isRestockModalOpen, setIsRestockModalOpen] = useState(false);
+    const [selectedForRestock, setSelectedForRestock] = useState(null);
+    const [restockData, setRestockData] = useState({ quantity: '', price: '' });
 
     useEffect(() => {
         fetchInventory();
@@ -52,45 +60,58 @@ const Inventory = () => {
             stock: item.current_stock,
             price: item.purchase_price || 0,
             yield: item.yield_percent || 100,
-            threshold: item.low_stock_threshold || 5
+            threshold: item.low_stock_threshold || 5,
+            category: item.category || 'Other'
         });
     };
 
     const handleSave = async (id) => {
-        const { error } = await supabase
-            .from('ingredients')
-            .update({
-                current_stock: editValues.stock,
-                purchase_price: editValues.price,
-                yield_percent: editValues.yield,
-                low_stock_threshold: editValues.threshold
-            })
-            .eq('id', id);
+        try {
+            const { error } = await supabase
+                .from('ingredients')
+                .update({
+                    current_stock: editValues.stock,
+                    purchase_price: editValues.price,
+                    yield_percent: editValues.yield,
+                    low_stock_threshold: editValues.threshold,
+                    category: editValues.category
+                })
+                .eq('id', id);
 
-        if (!error) {
+            if (error) throw error;
+
             setEditingId(null);
             fetchInventory();
+        } catch (error) {
+            console.error('Error updating ingredient:', error);
+            alert(`Failed to update ingredient: ${error.message}`);
         }
     };
 
     const handleCreate = async () => {
         if (!newIngredient.name) return;
 
-        const { error } = await supabase
-            .from('ingredients')
-            .insert([newIngredient]);
+        try {
+            const { error } = await supabase
+                .from('ingredients')
+                .insert([newIngredient]);
 
-        if (!error) {
+            if (error) throw error;
+
             setIsCreating(false);
             setNewIngredient({
                 name: '',
                 unit: 'kg',
+                category: 'Produce',
                 current_stock: 0,
                 low_stock_threshold: 5,
                 purchase_price: 0,
                 yield_percent: 100
             });
             fetchInventory();
+        } catch (error) {
+            console.error('Error creating ingredient:', error);
+            alert(`Failed to create ingredient: ${error.message}`);
         }
     };
 
@@ -106,238 +127,260 @@ const Inventory = () => {
         const quantity = parseFloat(wastageData.quantity);
         const costAtTime = (selectedForWastage.purchase_price / (selectedForWastage.yield_percent / 100)) * quantity;
 
-        // 1. Log Wastage
-        const { error: logError } = await supabase
-            .from('wastage_logs')
-            .insert([{
-                ingredient_id: selectedForWastage.id,
-                quantity: quantity,
-                reason: wastageData.reason,
-                cost_at_time: costAtTime
-            }]);
+        try {
+            // 1. Log Wastage
+            const { error: logError } = await supabase
+                .from('wastage_logs')
+                .insert([{
+                    ingredient_id: selectedForWastage.id,
+                    quantity: quantity,
+                    reason: wastageData.reason,
+                    cost_at_time: costAtTime
+                }]);
 
-        if (logError) {
-            alert('Error logging wastage');
-            return;
-        }
+            if (logError) throw logError;
 
-        // 2. Deduct Stock
-        const { error: updateError } = await supabase
-            .from('ingredients')
-            .update({ current_stock: selectedForWastage.current_stock - quantity })
-            .eq('id', selectedForWastage.id);
+            // 2. Deduct Stock
+            const { error: updateError } = await supabase
+                .from('ingredients')
+                .update({ current_stock: selectedForWastage.current_stock - quantity })
+                .eq('id', selectedForWastage.id);
 
-        if (!updateError) {
+            if (updateError) throw updateError;
+
             setIsWastageModalOpen(false);
             fetchInventory();
+        } catch (error) {
+            console.error('Error reporting wastage:', error);
+            alert(`Failed to report wastage: ${error.message}`);
         }
     };
 
-    const filteredIngredients = ingredients.filter(item =>
-        item.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const handleDelete = async (id) => {
+        if (confirm('Are you sure you want to delete this ingredient? This action cannot be undone.')) {
+            try {
+                const { error } = await supabase
+                    .from('ingredients')
+                    .delete()
+                    .eq('id', id);
+
+                if (error) throw error;
+
+                fetchInventory();
+            } catch (error) {
+                console.error('Error deleting ingredient:', error);
+                alert(`Failed to delete ingredient: ${error.message}`);
+            }
+        }
+    };
+
+    const openRestockModal = (item) => {
+        setSelectedForRestock(item);
+        setRestockData({ quantity: '', price: item.purchase_price || '' });
+        setIsRestockModalOpen(true);
+    };
+
+    const handleRestock = async () => {
+        if (!selectedForRestock || !restockData.quantity) {
+            alert("Please enter a valid quantity.");
+            return;
+        }
+
+        const quantity = parseFloat(restockData.quantity);
+        const currentStock = parseFloat(selectedForRestock.current_stock || 0);
+        const newPrice = restockData.price ? parseFloat(restockData.price) : selectedForRestock.purchase_price;
+
+        try {
+            const { error } = await supabase
+                .from('ingredients')
+                .update({
+                    current_stock: currentStock + quantity,
+                    purchase_price: newPrice
+                })
+                .eq('id', selectedForRestock.id);
+
+            if (error) throw error;
+
+            setIsRestockModalOpen(false);
+            fetchInventory();
+        } catch (error) {
+            console.error('Error restocking:', error);
+            alert(`Failed to restock: ${error.message}`);
+        }
+    };
+
+    const [categoryFilter, setCategoryFilter] = useState('All');
+    const [stockFilter, setStockFilter] = useState('all'); // 'all', 'low', 'good'
+
+    const filteredIngredients = ingredients.filter(item => {
+        const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCategory = categoryFilter === 'All' || (item.category || 'Other') === categoryFilter;
+        const isLow = item.current_stock <= item.low_stock_threshold;
+
+        if (stockFilter === 'low') return matchesSearch && matchesCategory && isLow;
+        if (stockFilter === 'good') return matchesSearch && matchesCategory && !isLow;
+        return matchesSearch && matchesCategory;
+    });
+
+    // Summary Calculations
+    const totalItems = ingredients.length;
+    const lowStockItems = ingredients.filter(i => i.current_stock <= i.low_stock_threshold).length;
+    const totalValue = ingredients.reduce((sum, item) => {
+        const costPerUnit = item.yield_percent > 0 ? (item.purchase_price / (item.yield_percent / 100)) : 0;
+        return sum + (costPerUnit * item.current_stock);
+    }, 0);
 
     return (
-        <div className="h-[calc(100vh-40px)] flex flex-col gap-6 relative">
-            {/* Header & Controls */}
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-surface p-6 rounded-3xl border border-border shadow-sm">
-                <div className="flex items-center gap-4 w-full md:w-auto">
-                    <div className="p-3 bg-secondary/20 rounded-2xl text-secondary">
-                        <Package size={24} />
+        <div className="h-[calc(100vh-40px)] flex flex-col gap-6 relative overflow-hidden">
+            {/* Header & Summary */}
+            <div className="flex flex-col gap-6 overflow-y-auto pb-20 px-1">
+                {/* Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-surface p-5 rounded-3xl border border-border shadow-sm">
+                        <p className="text-text-muted text-sm font-bold uppercase tracking-wider mb-1">Total Items</p>
+                        <p className="text-3xl font-bold text-text">{totalItems}</p>
                     </div>
-                    <div>
-                        <h1 className="text-2xl font-bold text-text">Inventory & Costing</h1>
-                        <p className="text-text-muted text-sm">Track stock and calculate real costs</p>
+                    <div className="bg-surface p-5 rounded-3xl border border-border shadow-sm">
+                        <p className="text-text-muted text-sm font-bold uppercase tracking-wider mb-1">Low Stock Alerts</p>
+                        <p className={`text-3xl font-bold ${lowStockItems > 0 ? 'text-red-400' : 'text-green-400'}`}>{lowStockItems}</p>
+                    </div>
+                    <div className="bg-surface p-5 rounded-3xl border border-border shadow-sm">
+                        <p className="text-text-muted text-sm font-bold uppercase tracking-wider mb-1">Total Inventory Value</p>
+                        <p className="text-3xl font-bold text-primary">LKR {totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                 </div>
 
-                <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={20} />
-                        <input
-                            type="text"
-                            placeholder="Search ingredients..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full md:w-64 bg-bg border border-border rounded-xl pl-10 pr-4 py-3 text-text focus:border-primary focus:outline-none"
-                        />
+                {/* Controls & Categories */}
+                <div className="flex flex-col gap-4 bg-surface p-6 rounded-3xl border border-border shadow-sm">
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div className="flex items-center gap-4 w-full md:w-auto">
+                            <div className="p-3 bg-secondary/20 rounded-2xl text-secondary">
+                                <Package size={24} />
+                            </div>
+                            <h1 className="text-2xl font-bold text-text">Inventory</h1>
+                        </div>
+
+                        <div className="flex gap-3 w-full md:w-auto">
+                            <div className="relative flex-1 md:w-64">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={20} />
+                                <input
+                                    type="text"
+                                    placeholder="Search..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full bg-bg border border-border rounded-xl pl-10 pr-4 py-3 text-text focus:border-primary focus:outline-none"
+                                />
+                            </div>
+                            <button
+                                onClick={() => setIsCreating(true)}
+                                className="flex items-center justify-center gap-2 bg-primary text-bg font-bold px-6 py-3 rounded-xl hover:opacity-90 transition-opacity"
+                            >
+                                <Plus size={20} />
+                                <span className="hidden md:inline">Add Item</span>
+                            </button>
+                        </div>
                     </div>
-                    <button
-                        onClick={() => setIsCreating(true)}
-                        className="flex items-center justify-center gap-2 bg-primary text-bg font-bold px-6 py-3 rounded-xl hover:opacity-90 transition-opacity"
-                    >
-                        <Plus size={20} />
-                        <span className="hidden md:inline">Add Ingredient</span>
-                        <span className="md:hidden">Add</span>
-                    </button>
+
+                    {/* Category Tabs */}
+                    <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                        <button
+                            onClick={() => setCategoryFilter('All')}
+                            className={`px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${categoryFilter === 'All' ? 'bg-text text-bg' : 'bg-bg text-text-muted hover:text-text border border-border'}`}
+                        >
+                            All
+                        </button>
+                        {CATEGORIES.map(cat => (
+                            <button
+                                key={cat}
+                                onClick={() => setCategoryFilter(cat)}
+                                className={`px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${categoryFilter === cat ? 'bg-text text-bg' : 'bg-bg text-text-muted hover:text-text border border-border'}`}
+                            >
+                                {cat}
+                            </button>
+                        ))}
+                    </div>
                 </div>
-            </div>
 
-            {/* Inventory Table */}
-            <div className="flex-1 min-h-0 bg-surface rounded-3xl border border-border overflow-hidden flex flex-col">
-                <div className="overflow-x-auto overflow-y-auto flex-1">
-                    <table className="w-full text-left min-w-[800px]">
-                        <thead className="bg-bg/50 border-b border-border sticky top-0 z-10 backdrop-blur-sm">
-                            <tr>
-                                <th className="p-4 font-bold text-text-muted uppercase text-xs tracking-wider">Ingredient</th>
-                                <th className="p-4 font-bold text-text-muted uppercase text-xs tracking-wider">Stock Level</th>
-                                <th className="p-4 font-bold text-text-muted uppercase text-xs tracking-wider">Min Stock</th>
-                                <th className="p-4 font-bold text-text-muted uppercase text-xs tracking-wider">Purchase Price</th>
-                                <th className="p-4 font-bold text-text-muted uppercase text-xs tracking-wider">Yield %</th>
-                                <th className="p-4 font-bold text-text-muted uppercase text-xs tracking-wider">Real Cost / Unit</th>
-                                <th className="p-4 font-bold text-text-muted uppercase text-xs tracking-wider text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {filteredIngredients.map(item => {
-                                const isLow = item.current_stock <= item.low_stock_threshold;
-                                const isEditing = editingId === item.id;
+                {/* Inventory Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {filteredIngredients.map(item => {
+                        const isLow = item.current_stock <= item.low_stock_threshold;
+                        const yieldDecimal = (item.yield_percent || 100) / 100;
+                        const realCost = yieldDecimal > 0 ? (item.purchase_price / yieldDecimal) : 0;
 
-                                // Calculate Real Cost: Price / (Yield/100)
-                                const yieldDecimal = (item.yield_percent || 100) / 100;
-                                const realCost = yieldDecimal > 0 ? (item.purchase_price / yieldDecimal) : 0;
+                        return (
+                            <div key={item.id} className="bg-surface p-5 rounded-3xl border border-border shadow-sm hover:shadow-md transition-shadow group relative overflow-hidden">
+                                {isLow && <div className="absolute top-0 right-0 bg-red-400 w-16 h-16 blur-2xl opacity-20 pointer-events-none" />}
 
-                                return (
-                                    <tr key={item.id} className="hover:bg-surface-hover transition-colors group">
-                                        <td className="p-4">
-                                            <div className="font-bold text-text">{item.name}</div>
-                                            <div className="text-xs text-text-muted font-medium bg-bg px-2 py-0.5 rounded inline-block mt-1">{item.unit}</div>
-                                        </td>
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                        <span className="text-xs font-bold text-text-muted uppercase tracking-wider bg-bg px-2 py-1 rounded-lg border border-border">
+                                            {item.category || 'Other'}
+                                        </span>
+                                        <h3 className="text-xl font-bold text-text mt-2">{item.name}</h3>
+                                    </div>
+                                    <div className={`flex flex-col items-end ${isLow ? 'text-red-400' : 'text-text'}`}>
+                                        <span className="text-2xl font-bold">{item.current_stock}</span>
+                                        <span className="text-xs font-bold opacity-60">{item.unit}</span>
+                                    </div>
+                                </div>
 
-                                        {/* Stock Level */}
-                                        <td className="p-4">
-                                            {isEditing ? (
-                                                <input
-                                                    type="number"
-                                                    value={editValues.stock}
-                                                    onChange={(e) => setEditValues({ ...editValues, stock: e.target.value })}
-                                                    className="bg-bg border border-primary rounded-lg px-3 py-2 w-24 text-text focus:outline-none font-bold"
-                                                />
-                                            ) : (
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`font-bold text-lg ${isLow ? 'text-red-400' : 'text-text'}`}>
-                                                        {item.current_stock}
-                                                    </span>
-                                                    {isLow && (
-                                                        <div className="flex items-center gap-1 text-xs font-bold text-red-400 bg-red-400/10 px-2 py-1 rounded-full">
-                                                            <AlertTriangle size={12} />
-                                                            Low Stock
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </td>
+                                <div className="space-y-3 mb-6">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-text-muted">Min Stock</span>
+                                        <span className="font-bold text-text">{item.low_stock_threshold} {item.unit}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-text-muted">Purchase Price</span>
+                                        <span className="font-bold text-text">LKR {item.purchase_price}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-text-muted">Real Cost</span>
+                                        <span className="font-bold text-secondary">LKR {realCost.toFixed(2)}</span>
+                                    </div>
+                                </div>
 
-                                        {/* Min Stock Level */}
-                                        <td className="p-4">
-                                            {isEditing ? (
-                                                <input
-                                                    type="number"
-                                                    value={editValues.threshold}
-                                                    onChange={(e) => setEditValues({ ...editValues, threshold: e.target.value })}
-                                                    className="bg-bg border border-primary rounded-lg px-3 py-2 w-20 text-text focus:outline-none font-bold"
-                                                />
-                                            ) : (
-                                                <span className="text-text-muted font-medium">{item.low_stock_threshold}</span>
-                                            )}
-                                        </td>
-
-                                        {/* Purchase Price */}
-                                        <td className="p-4">
-                                            {isEditing ? (
-                                                <input
-                                                    type="number"
-                                                    value={editValues.price}
-                                                    onChange={(e) => setEditValues({ ...editValues, price: e.target.value })}
-                                                    className="bg-bg border border-primary rounded-lg px-3 py-2 w-28 text-text focus:outline-none font-bold"
-                                                    placeholder="0.00"
-                                                />
-                                            ) : (
-                                                <span className="text-text-muted font-medium">LKR {item.purchase_price || 0}</span>
-                                            )}
-                                        </td>
-
-                                        {/* Yield % */}
-                                        <td className="p-4">
-                                            {isEditing ? (
-                                                <div className="flex items-center gap-2">
-                                                    <input
-                                                        type="number"
-                                                        value={editValues.yield}
-                                                        onChange={(e) => setEditValues({ ...editValues, yield: e.target.value })}
-                                                        className="bg-bg border border-primary rounded-lg px-3 py-2 w-20 text-text focus:outline-none font-bold"
-                                                    />
-                                                    <span className="text-text-muted font-bold">%</span>
-                                                </div>
-                                            ) : (
-                                                <span className={`font-bold ${item.yield_percent < 100 ? 'text-secondary' : 'text-text-muted'}`}>
-                                                    {item.yield_percent || 100}%
-                                                </span>
-                                            )}
-                                        </td>
-
-                                        {/* Real Cost Calculation */}
-                                        <td className="p-4">
-                                            <div className="font-bold text-lg text-secondary">
-                                                LKR {realCost.toFixed(2)}
-                                            </div>
-                                            {item.yield_percent < 100 && (
-                                                <div className="text-xs text-text-muted mt-1">
-                                                    (vs LKR {item.purchase_price})
-                                                </div>
-                                            )}
-                                        </td>
-
-                                        <td className="p-4 text-right">
-                                            {isEditing ? (
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={() => handleSave(item.id)}
-                                                        className="p-2 bg-primary text-bg rounded-lg hover:opacity-90 transition-opacity"
-                                                    >
-                                                        <Check size={18} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setEditingId(null)}
-                                                        className="p-2 bg-surface-hover text-text-muted rounded-lg hover:text-text transition-colors"
-                                                    >
-                                                        <X size={18} />
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={() => openWastageModal(item)}
-                                                        className="p-2 text-text-muted hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100"
-                                                        title="Report Wastage"
-                                                    >
-                                                        <Trash2 size={18} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => startEditing(item)}
-                                                        className="p-2 text-text-muted hover:text-primary hover:bg-primary/10 rounded-lg transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100"
-                                                        title="Edit Ingredient"
-                                                    >
-                                                        <Edit2 size={18} />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-
-                            {filteredIngredients.length === 0 && (
-                                <tr>
-                                    <td colSpan="6" className="p-8 text-center text-text-muted opacity-50">
-                                        <Package size={48} className="mx-auto mb-4" />
-                                        <p className="text-lg font-medium">No ingredients found</p>
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                                <div className="grid grid-cols-4 gap-2">
+                                    <button
+                                        onClick={() => openRestockModal(item)}
+                                        className="col-span-1 bg-green-400/10 text-green-400 hover:bg-green-400 hover:text-white p-2 rounded-xl flex items-center justify-center transition-colors"
+                                        title="Restock"
+                                    >
+                                        <Plus size={20} />
+                                    </button>
+                                    <button
+                                        onClick={() => startEditing(item)}
+                                        className="col-span-1 bg-primary/10 text-primary hover:bg-primary hover:text-bg p-2 rounded-xl flex items-center justify-center transition-colors"
+                                        title="Edit"
+                                    >
+                                        <Edit2 size={20} />
+                                    </button>
+                                    <button
+                                        onClick={() => openWastageModal(item)}
+                                        className="col-span-1 bg-orange-400/10 text-orange-400 hover:bg-orange-400 hover:text-white p-2 rounded-xl flex items-center justify-center transition-colors"
+                                        title="Report Wastage"
+                                    >
+                                        <MinusCircle size={20} />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(item.id)}
+                                        className="col-span-1 bg-red-400/10 text-red-400 hover:bg-red-400 hover:text-white p-2 rounded-xl flex items-center justify-center transition-colors"
+                                        title="Delete"
+                                    >
+                                        <Trash2 size={20} />
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
+
+                {filteredIngredients.length === 0 && (
+                    <div className="text-center py-20 opacity-50">
+                        <Package size={64} className="mx-auto mb-4 text-text-muted" />
+                        <p className="text-xl font-bold text-text-muted">No items found</p>
+                    </div>
+                )}
             </div>
 
             {/* Create Modal */}
@@ -366,6 +409,18 @@ const Inventory = () => {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
+                                    <label className="block text-text-muted text-sm font-bold mb-1">Category</label>
+                                    <select
+                                        value={newIngredient.category}
+                                        onChange={e => setNewIngredient({ ...newIngredient, category: e.target.value })}
+                                        className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
+                                    >
+                                        {CATEGORIES.map(cat => (
+                                            <option key={cat} value={cat}>{cat}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
                                     <label className="block text-text-muted text-sm font-bold mb-1">Unit</label>
                                     <select
                                         value={newIngredient.unit}
@@ -379,24 +434,15 @@ const Inventory = () => {
                                         <option value="count">count</option>
                                     </select>
                                 </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-text-muted text-sm font-bold mb-1">Low Stock Alert</label>
                                     <input
                                         type="number"
                                         value={newIngredient.low_stock_threshold}
                                         onChange={e => setNewIngredient({ ...newIngredient, low_stock_threshold: e.target.value })}
-                                        className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-text-muted text-sm font-bold mb-1">Purchase Price</label>
-                                    <input
-                                        type="number"
-                                        value={newIngredient.purchase_price}
-                                        onChange={e => setNewIngredient({ ...newIngredient, purchase_price: e.target.value })}
                                         className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
                                     />
                                 </div>
@@ -409,6 +455,16 @@ const Inventory = () => {
                                         className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
                                     />
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-text-muted text-sm font-bold mb-1">Purchase Price</label>
+                                <input
+                                    type="number"
+                                    value={newIngredient.purchase_price}
+                                    onChange={e => setNewIngredient({ ...newIngredient, purchase_price: e.target.value })}
+                                    className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
+                                />
                             </div>
 
                             <button
@@ -479,6 +535,65 @@ const Inventory = () => {
                                 className="w-full py-4 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-colors mt-4"
                             >
                                 Confirm Wastage
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Restock Modal */}
+            {isRestockModalOpen && selectedForRestock && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-surface border border-border rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <h2 className="text-2xl font-bold text-text">Add Stock</h2>
+                                <p className="text-text-muted text-sm">Purchasing: {selectedForRestock.name}</p>
+                            </div>
+                            <button onClick={() => setIsRestockModalOpen(false)} className="p-2 hover:bg-surface-hover rounded-full text-text-muted">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-text-muted text-sm font-bold mb-1">Quantity Purchased ({selectedForRestock.unit})</label>
+                                <input
+                                    type="number"
+                                    value={restockData.quantity}
+                                    onChange={e => setRestockData({ ...restockData, quantity: e.target.value })}
+                                    className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
+                                    placeholder="0.00"
+                                    autoFocus
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-text-muted text-sm font-bold mb-1">New Purchase Price (LKR)</label>
+                                <input
+                                    type="number"
+                                    value={restockData.price}
+                                    onChange={e => setRestockData({ ...restockData, price: e.target.value })}
+                                    className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
+                                    placeholder={selectedForRestock.purchase_price}
+                                />
+                                <p className="text-xs text-text-muted mt-1">Leave empty to keep current price: LKR {selectedForRestock.purchase_price}</p>
+                            </div>
+
+                            <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 flex items-start gap-3">
+                                <Plus className="text-green-400 shrink-0" size={20} />
+                                <div>
+                                    <p className="text-green-400 font-bold text-sm">Stock will increase!</p>
+                                    <p className="text-green-400/80 text-xs mt-1">
+                                        New Total: {parseFloat(selectedForRestock.current_stock) + (parseFloat(restockData.quantity) || 0)} {selectedForRestock.unit}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={handleRestock}
+                                className="w-full py-4 bg-green-500 text-white font-bold rounded-xl hover:bg-green-600 transition-colors mt-4"
+                            >
+                                Confirm Purchase
                             </button>
                         </div>
                     </div>
