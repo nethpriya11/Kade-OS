@@ -13,6 +13,7 @@ const Inventory = () => {
     const [editingId, setEditingId] = useState(null);
     const [editValues, setEditValues] = useState({ stock: '', price: '', yield: '', threshold: '', category: '' });
     const [isCreating, setIsCreating] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [newIngredient, setNewIngredient] = useState({
         name: '',
@@ -98,13 +99,19 @@ const Inventory = () => {
 
     const handleCreate = async () => {
         if (!newIngredient.name) return;
+        setIsSubmitting(true);
 
         try {
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('ingredients')
-                .insert([newIngredient]);
+                .insert([newIngredient])
+                .select()
+                .single();
 
             if (error) throw error;
+
+            // Optimistic Update (Store handles duplicates)
+            useInventoryStore.getState().addIngredient(data);
 
             setIsCreating(false);
             setNewIngredient({
@@ -116,10 +123,11 @@ const Inventory = () => {
                 purchase_price: 0,
                 yield_percent: 100
             });
-            // Store updates automatically via RealtimeManager
         } catch (error) {
             console.error('Error creating ingredient:', error);
             alert(`Failed to create ingredient: ${error.message}`);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -503,9 +511,17 @@ const Inventory = () => {
 
                             <button
                                 onClick={handleCreate}
-                                className="w-full py-4 bg-primary text-bg font-bold rounded-xl hover:opacity-90 transition-opacity mt-4"
+                                disabled={isSubmitting}
+                                className="w-full py-4 bg-primary text-bg font-bold rounded-xl hover:opacity-90 transition-opacity mt-4 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
                             >
-                                Create Ingredient
+                                {isSubmitting ? (
+                                    <>
+                                        <Sparkles className="animate-spin" size={20} />
+                                        Creating...
+                                    </>
+                                ) : (
+                                    'Create Ingredient'
+                                )}
                             </button>
                         </div>
                     </div>

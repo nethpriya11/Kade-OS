@@ -9,9 +9,10 @@ export const useInventoryStore = create((set, get) => ({
     setLogs: (logs) => set({ logs }),
 
     // Optimistic updates (optional, but good for UI responsiveness)
-    addIngredient: (ingredient) => set((state) => ({
-        ingredients: [...state.ingredients, ingredient]
-    })),
+    addIngredient: (ingredient) => set((state) => {
+        if (state.ingredients.some(i => i.id === ingredient.id)) return state;
+        return { ingredients: [...state.ingredients, ingredient] };
+    }),
 
     updateIngredient: (id, updates) => set((state) => ({
         ingredients: state.ingredients.map(ing =>
