@@ -19,3 +19,17 @@ export const askGemini = async (prompt) => {
         return `Error: ${error.message || "Unknown error occurred"}. Please check your API key and model availability.`;
     }
 };
+
+export const predictCategory = async (itemName, existingCategories) => {
+    try {
+        const prompt = `Given the item name '${itemName}', suggest a short, descriptive category. Existing categories are: ${existingCategories.join(', ')}. If it fits well, use one of these. If not, create a new appropriate category name (e.g., 'Cleaning', 'Beverage'). Return ONLY the category name.`;
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        // Clean up response (remove extra whitespace/newlines)
+        return text.trim();
+    } catch (error) {
+        console.error("Error predicting category:", error);
+        return null;
+    }
+};

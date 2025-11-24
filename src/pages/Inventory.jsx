@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Package, AlertTriangle, Save, Plus, Search, X, Check, Edit2, Trash2, MinusCircle } from 'lucide-react';
+import { predictCategory } from '../lib/gemini';
+import { Package, AlertTriangle, Save, Plus, Search, X, Check, Edit2, Trash2, MinusCircle, Sparkles } from 'lucide-react';
 
-const CATEGORIES = ['Produce', 'Meat', 'Spices', 'Dairy', 'Dry Goods', 'Bakery', 'Other'];
+const DEFAULT_CATEGORIES = ['Produce', 'Meat', 'Spices', 'Dairy', 'Dry Goods', 'Bakery', 'Other'];
 
 const Inventory = () => {
     const [ingredients, setIngredients] = useState([]);
@@ -30,6 +31,28 @@ const Inventory = () => {
     const [isRestockModalOpen, setIsRestockModalOpen] = useState(false);
     const [selectedForRestock, setSelectedForRestock] = useState(null);
     const [restockData, setRestockData] = useState({ quantity: '', price: '' });
+
+    // AI Prediction State
+    const [isPredicting, setIsPredicting] = useState(false);
+
+    // Derived Categories
+    const allCategories = Array.from(new Set([...DEFAULT_CATEGORIES, ...ingredients.map(i => i.category || 'Other')]));
+
+    // Auto-Categorization Effect
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            if (newIngredient.name.length > 2 && isCreating) {
+                setIsPredicting(true);
+                const predicted = await predictCategory(newIngredient.name, allCategories);
+                if (predicted) {
+                    setNewIngredient(prev => ({ ...prev, category: predicted }));
+                }
+                setIsPredicting(false);
+            }
+        }, 1000);
+
+        return () => clearTimeout(timer);
+    }, [newIngredient.name, isCreating]);
 
     useEffect(() => {
         fetchInventory();
@@ -289,7 +312,7 @@ const Inventory = () => {
                         >
                             All
                         </button>
-                        {CATEGORIES.map(cat => (
+                        {allCategories.map(cat => (
                             <button
                                 key={cat}
                                 onClick={() => setCategoryFilter(cat)}
@@ -410,15 +433,24 @@ const Inventory = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-text-muted text-sm font-bold mb-1">Category</label>
-                                    <select
-                                        value={newIngredient.category}
-                                        onChange={e => setNewIngredient({ ...newIngredient, category: e.target.value })}
-                                        className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
-                                    >
-                                        {CATEGORIES.map(cat => (
-                                            <option key={cat} value={cat}>{cat}</option>
-                                        ))}
-                                    </select>
+                                    <div className="relative">
+                                        <select
+                                            value={newIngredient.category}
+                                            onChange={e => setNewIngredient({ ...newIngredient, category: e.target.value })}
+                                            className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none appearance-none"
+                                        >
+                                            {allCategories.map(cat => (
+                                                <option key={cat} value={cat}>{cat}</option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                            {isPredicting ? (
+                                                <Sparkles className="text-primary animate-pulse" size={16} />
+                                            ) : (
+                                                <div className="w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 border-t-text-muted" />
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-text-muted text-sm font-bold mb-1">Unit</label>
