@@ -11,6 +11,7 @@ const Inventory = () => {
     const { ingredients, logs: historyLogs, loading } = useInventoryStore();
 
     const [editingId, setEditingId] = useState(null);
+    const [isSaving, setIsSaving] = useState(false);
     const [editValues, setEditValues] = useState({ stock: '', price: '', yield: '', threshold: '', category: '' });
     const [isCreating, setIsCreating] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -77,6 +78,7 @@ const Inventory = () => {
     };
 
     const handleSave = async (id) => {
+        setIsSaving(true);
         try {
             // Create a promise that rejects after 10 seconds
             const timeoutPromise = new Promise((_, reject) =>
@@ -112,6 +114,8 @@ const Inventory = () => {
         } catch (error) {
             console.error('Error updating ingredient:', error);
             alert(`Failed to update ingredient: ${error.message}`);
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -521,6 +525,92 @@ const Inventory = () => {
                 )}
             </div>
 
+            {/* Edit Modal */}
+            {editingId && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-surface border border-border rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-bold text-text">Edit Ingredient</h2>
+                            <button onClick={() => setEditingId(null)} className="p-2 hover:bg-surface-hover rounded-full text-text-muted">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-text-muted text-sm font-bold mb-1">Category</label>
+                                    <select
+                                        value={editValues.category}
+                                        onChange={e => setEditValues({ ...editValues, category: e.target.value })}
+                                        className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
+                                    >
+                                        {DEFAULT_CATEGORIES.map(cat => (
+                                            <option key={cat} value={cat}>{cat}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-text-muted text-sm font-bold mb-1">Current Stock</label>
+                                    <input
+                                        type="number"
+                                        value={editValues.stock}
+                                        onChange={e => setEditValues({ ...editValues, stock: e.target.value })}
+                                        className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-text-muted text-sm font-bold mb-1">Low Stock Alert</label>
+                                    <input
+                                        type="number"
+                                        value={editValues.threshold}
+                                        onChange={e => setEditValues({ ...editValues, threshold: e.target.value })}
+                                        className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-text-muted text-sm font-bold mb-1">Yield %</label>
+                                    <input
+                                        type="number"
+                                        value={editValues.yield}
+                                        onChange={e => setEditValues({ ...editValues, yield: e.target.value })}
+                                        className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-text-muted text-sm font-bold mb-1">Purchase Price</label>
+                                <input
+                                    type="number"
+                                    value={editValues.price}
+                                    onChange={e => setEditValues({ ...editValues, price: e.target.value })}
+                                    className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
+                                />
+                            </div>
+
+                            <button
+                                onClick={() => handleSave(editingId)}
+                                disabled={isSaving}
+                                className="w-full py-4 bg-primary text-bg font-bold rounded-xl hover:opacity-90 transition-opacity mt-4 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+                            >
+                                {isSaving ? (
+                                    <>
+                                        <Sparkles className="animate-spin" size={20} />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    'Save Changes'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Create Modal */}
             {isCreating && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -663,6 +753,7 @@ const Inventory = () => {
                                     <option value="Spilled">Spilled / Dropped</option>
                                     <option value="Overcooked">Overcooked / Burnt</option>
                                     <option value="Customer Return">Customer Return</option>
+                                    <option value="Staff Meal">Staff Meal</option>
                                     <option value="Other">Other</option>
                                 </select>
                             </div>
