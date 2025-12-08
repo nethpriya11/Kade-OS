@@ -370,7 +370,7 @@ const Inventory = () => {
             {/* Header & Summary */}
             <div className="flex flex-col gap-6 overflow-y-auto pb-20 px-1">
                 {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="bg-surface p-5 rounded-3xl border border-border shadow-sm">
                         <p className="text-text-muted text-sm font-bold uppercase tracking-wider mb-1">Total Items</p>
                         <p className="text-3xl font-bold text-text">{totalItems}</p>
@@ -387,7 +387,7 @@ const Inventory = () => {
 
                 {/* Controls & Categories */}
                 <div className="flex flex-col gap-4 bg-surface p-6 rounded-3xl border border-border shadow-sm">
-                    <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div className="flex flex-col sm:flex-row flex-wrap justify-between items-center gap-4">
                         <div className="flex items-center gap-4 w-full md:w-auto">
                             <div className="p-3 bg-secondary/20 rounded-2xl text-secondary">
                                 <Package size={24} />
@@ -444,7 +444,7 @@ const Inventory = () => {
                 </div>
 
                 {/* Inventory Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {filteredIngredients.map(item => {
                         const isLow = item.current_stock <= item.low_stock_threshold;
                         const yieldDecimal = (item.yield_percent || 100) / 100;
@@ -528,7 +528,7 @@ const Inventory = () => {
             {/* Edit Modal */}
             {editingId && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-surface border border-border rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+                    <div className="bg-surface border border-border rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 max-h-[85vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-2xl font-bold text-text">Edit Ingredient</h2>
                             <button onClick={() => setEditingId(null)} className="p-2 hover:bg-surface-hover rounded-full text-text-muted">
@@ -614,7 +614,7 @@ const Inventory = () => {
             {/* Create Modal */}
             {isCreating && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-surface border border-border rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+                    <div className="bg-surface border border-border rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 max-h-[85vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-2xl font-bold text-text">Add New Ingredient</h2>
                             <button onClick={() => setIsCreating(false)} className="p-2 hover:bg-surface-hover rounded-full text-text-muted">
@@ -790,7 +790,7 @@ const Inventory = () => {
             {/* Restock Modal */}
             {isRestockModalOpen && selectedForRestock && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-surface border border-border rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+                    <div className="bg-surface border border-border rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 max-h-[85vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-6">
                             <div>
                                 <h2 className="text-2xl font-bold text-text">Add Stock</h2>
