@@ -134,7 +134,7 @@ const POS = () => {
     return (
         <div className="flex flex-col md:flex-row h-auto md:h-[calc(100vh-40px)] gap-6 md:gap-8 pb-20 md:pb-0">
             {/* Menu Selection */}
-            <div className="flex-1 overflow-y-auto pr-0 md:pr-4">
+            <div className="flex-1 overflow-y-auto pr-0 md:pr-4 min-w-0">
                 <motion.header
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -161,7 +161,7 @@ const POS = () => {
                                 variants={container}
                                 initial="hidden"
                                 animate="show"
-                                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+                                className="grid grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4"
                             >
                                 {items.map(item => (
                                     <motion.button
@@ -190,7 +190,7 @@ const POS = () => {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.2 }}
-                className="w-full md:w-[400px] glass rounded-3xl flex flex-col h-[500px] md:h-full shadow-2xl shadow-black/50 order-first md:order-last mb-6 md:mb-0 overflow-hidden"
+                className="w-full md:w-[320px] lg:w-[400px] glass rounded-3xl flex flex-col h-[500px] md:h-full shadow-2xl shadow-black/50 order-first md:order-last mb-6 md:mb-0 overflow-hidden shrink-0"
             >
                 <div className="p-4 md:p-6 border-b border-border bg-surface/50 backdrop-blur-xl">
                     <h2 className="text-xl font-bold text-text flex items-center gap-2">
