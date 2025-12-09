@@ -110,20 +110,16 @@ const Orders = () => {
 
                             <div className="space-y-2 mb-6 border-t border-border/50 pt-4 relative z-10">
                                 {order.order_items?.map(item => (
-                                    <div key={item.id} className="flex justify-between text-sm">
-                                        <span className="text-text font-medium">
-                                            <span className="text-primary font-bold mr-2">{item.quantity}x</span>
+                                    <div key={item.id} className="flex justify-between text-base">
+                                        <span className="text-text font-bold">
+                                            <span className="text-primary text-lg mr-3">{item.quantity}x</span>
                                             {item.menu_items?.name}
                                         </span>
-                                        <span className="text-text-muted">LKR {item.price_at_time * item.quantity}</span>
                                     </div>
                                 ))}
                             </div>
 
-                            <div className="flex justify-between items-center border-t border-border/50 pt-4 mb-4 relative z-10">
-                                <span className="text-text-muted text-sm font-bold">Total</span>
-                                <span className="text-xl font-bold text-text">LKR {order.total_amount}</span>
-                            </div>
+
 
                             <div className="relative z-10">
                                 {status === 'pending' && (
