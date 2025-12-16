@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { Utensils, Plus, Trash2, Save, ChevronRight, ChefHat, Edit2, Check, X, Search, Filter } from 'lucide-react';
 
@@ -12,6 +13,10 @@ const Menu = () => {
     const [newItem, setNewItem] = useState({ name: '', category: 'Base', price: '' });
     const [editingPrice, setEditingPrice] = useState(false);
     const [editPrice, setEditPrice] = useState('');
+    const [editingCategory, setEditingCategory] = useState(false);
+    const [editCategory, setEditCategory] = useState('');
+    const [editingCost, setEditingCost] = useState(false);
+    const [editCost, setEditCost] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All');
 
@@ -34,6 +39,8 @@ const Menu = () => {
         if (selectedItem) {
             fetchRecipe(selectedItem.id);
             setEditPrice(selectedItem.price); // Initialize edit price
+            setEditCategory(selectedItem.category); // Initialize edit category
+            setEditCost(selectedItem.cost || 0); // Initialize edit cost
         }
     }, [selectedItem]);
 
@@ -112,15 +119,48 @@ const Menu = () => {
         }
     };
 
-    // Calculate Total Cost
-    const totalCost = recipe.reduce((sum, r) => {
+    // Update Menu Item Category
+    const updateCategory = async () => {
+        if (!editCategory || !selectedItem) return;
+
+        const { error } = await supabase
+            .from('menu_items')
+            .update({ category: editCategory })
+            .eq('id', selectedItem.id);
+
+        if (!error) {
+            setSelectedItem({ ...selectedItem, category: editCategory });
+            setEditingCategory(false);
+            fetchData(); // Refresh list
+        }
+    };
+
+    // Update Menu Item Cost
+    const updateCost = async () => {
+        if (editCost === '' || !selectedItem) return;
+
+        const { error } = await supabase
+            .from('menu_items')
+            .update({ cost: editCost })
+            .eq('id', selectedItem.id);
+
+        if (!error) {
+            setSelectedItem({ ...selectedItem, cost: editCost });
+            setEditingCost(false);
+            fetchData(); // Refresh list
+        }
+    };
+
+    // Calculate Recipe Cost
+    const recipeCost = recipe.reduce((sum, r) => {
         const ing = r.ingredients;
         const yieldDecimal = (ing.yield_percent || 100) / 100;
         const realCostPerUnit = yieldDecimal > 0 ? (ing.purchase_price / yieldDecimal) : 0;
         return sum + (realCostPerUnit * r.quantity_required);
     }, 0);
 
-    const grossMargin = selectedItem ? ((selectedItem.price - totalCost) / selectedItem.price) * 100 : 0;
+    const currentCost = selectedItem?.cost || 0;
+    const grossMargin = selectedItem ? ((selectedItem.price - currentCost) / selectedItem.price) * 100 : 0;
 
     // Filter Menu Items
     const filteredItems = menuItems.filter(item => {
@@ -214,8 +254,8 @@ const Menu = () => {
             </div>
 
             {/* Create Modal */}
-            {isCreating && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            {isCreating && createPortal(
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200">
                     <div className="bg-surface border border-border rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-2xl font-bold text-text">New Menu Item</h2>
@@ -265,12 +305,13 @@ const Menu = () => {
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Recipe Edit Modal */}
-            {selectedItem && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            {selectedItem && createPortal(
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200">
                     <div className="bg-surface border border-border rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
                         {/* Modal Header */}
                         <div className="p-6 border-b border-border flex justify-between items-start bg-bg/50 rounded-t-3xl">
@@ -302,8 +343,54 @@ const Menu = () => {
                                     </div>
 
                                     <div className="flex items-center gap-2 bg-surface px-3 py-1 rounded-lg border border-border">
+                                        <span className="text-text-muted">Category:</span>
+                                        {editingCategory ? (
+                                            <div className="flex items-center gap-2">
+                                                <select
+                                                    value={editCategory}
+                                                    onChange={(e) => setEditCategory(e.target.value)}
+                                                    className="bg-bg border border-primary rounded px-2 py-0.5 text-text font-bold focus:outline-none text-sm"
+                                                    autoFocus
+                                                >
+                                                    {['Base', 'Protein', 'Drink', 'Extra'].map(c => (
+                                                        <option key={c} value={c}>{c}</option>
+                                                    ))}
+                                                </select>
+                                                <button onClick={updateCategory} className="text-green-400 hover:text-green-300"><Check size={16} /></button>
+                                                <button onClick={() => setEditingCategory(false)} className="text-red-400 hover:text-red-300"><X size={16} /></button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-text font-bold">{selectedItem.category}</span>
+                                                <button onClick={() => { setEditingCategory(true); setEditCategory(selectedItem.category); }} className="text-text-muted hover:text-primary">
+                                                    <Edit2 size={14} />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex items-center gap-2 bg-surface px-3 py-1 rounded-lg border border-border">
                                         <span className="text-text-muted">Cost:</span>
-                                        <span className="text-secondary font-bold">LKR {totalCost.toFixed(2)}</span>
+                                        {editingCost ? (
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="number"
+                                                    value={editCost}
+                                                    onChange={(e) => setEditCost(e.target.value)}
+                                                    className="bg-bg border border-primary rounded px-2 py-0.5 w-20 text-text font-bold focus:outline-none"
+                                                    autoFocus
+                                                />
+                                                <button onClick={updateCost} className="text-green-400 hover:text-green-300"><Check size={16} /></button>
+                                                <button onClick={() => setEditingCost(false)} className="text-red-400 hover:text-red-300"><X size={16} /></button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-secondary font-bold">LKR {currentCost}</span>
+                                                <button onClick={() => { setEditingCost(true); setEditCost(currentCost); }} className="text-text-muted hover:text-primary">
+                                                    <Edit2 size={14} />
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <span className={`font-bold px-3 py-1 rounded-lg border ${grossMargin > 50
@@ -329,6 +416,11 @@ const Menu = () => {
                                     <ChefHat size={16} />
                                     Recipe Ingredients
                                 </h3>
+                                {recipe.length > 0 && (
+                                    <span className="text-xs text-text-muted">
+                                        Recipe Cost: LKR {recipeCost.toFixed(2)}
+                                    </span>
+                                )}
                             </div>
 
                             <div className="space-y-3 mb-8">
@@ -411,7 +503,8 @@ const Menu = () => {
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

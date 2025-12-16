@@ -5,7 +5,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 const Analytics = () => {
     const [loading, setLoading] = useState(true);
-    const [timeRange, setTimeRange] = useState('week'); // 'today', 'week', 'month'
+    const [timeRange, setTimeRange] = useState('today'); // 'today', 'week', 'month'
     const [metrics, setMetrics] = useState({
         revenue: 0,
         orders: 0,
@@ -16,6 +16,7 @@ const Analytics = () => {
     const [revenueData, setRevenueData] = useState([]);
     const [categoryData, setCategoryData] = useState([]);
     const [topItems, setTopItems] = useState([]);
+    const [ordersList, setOrdersList] = useState([]);
 
     useEffect(() => {
         fetchAnalytics();
@@ -65,6 +66,7 @@ const Analytics = () => {
         if (orders && wastage) {
             processAnalytics(orders, wastage);
         }
+        setOrdersList(orders || []);
         setLoading(false);
     };
 
@@ -275,6 +277,55 @@ const Analytics = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Today's Sales Log */}
+            {timeRange === 'today' && (
+                <div className="bg-surface p-6 rounded-3xl border border-border shadow-sm">
+                    <h3 className="text-lg font-bold text-text mb-6">Today's Sales Log</h3>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="text-text-muted border-b border-border">
+                                    <th className="py-3 font-medium">Time</th>
+                                    <th className="py-3 font-medium">Items</th>
+                                    <th className="py-3 font-medium text-right">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {ordersList.length > 0 ? (
+                                    ordersList
+                                        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                                        .map((order) => (
+                                            <tr key={order.id} className="border-b border-border/50 hover:bg-white/5 transition-colors">
+                                                <td className="py-4 text-text-muted">
+                                                    {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </td>
+                                                <td className="py-4">
+                                                    <div className="flex flex-col gap-1">
+                                                        {order.order_items.map((item, idx) => (
+                                                            <span key={idx} className="text-sm text-text">
+                                                                {item.quantity}x {item.menu_items?.name || 'Unknown Item'}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </td>
+                                                <td className="py-4 text-right font-bold text-primary">
+                                                    LKR {order.total_amount.toLocaleString()}
+                                                </td>
+                                            </tr>
+                                        ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan="3" className="py-8 text-center text-text-muted">
+                                            No sales recorded today yet.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
