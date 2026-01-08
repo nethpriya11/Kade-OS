@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Clock, CheckCircle, ChefHat, Bell, Volume2, X } from 'lucide-react';
+import { Clock, CheckCircle, ChefHat, Bell, Volume2, X, Printer } from 'lucide-react';
+import { printReceipt } from '../utils/printReceipt';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Orders = () => {
@@ -104,7 +105,16 @@ const Orders = () => {
                                     <span className="bg-bg px-2 py-1 rounded-lg text-xs font-bold text-text-muted mb-1 flex items-center gap-1">
                                         <Clock size={12} /> {getTimeElapsed(order.created_at)}
                                     </span>
-                                    <span className="text-xs font-bold text-primary">Takeout</span>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => printReceipt(order)}
+                                            className="p-1.5 bg-bg/50 rounded-lg hover:bg-primary hover:text-bg transition-colors"
+                                            title="Print Receipt"
+                                        >
+                                            <Printer size={14} />
+                                        </button>
+                                        <span className="text-xs font-bold text-primary self-center">Takeout</span>
+                                    </div>
                                 </div>
                             </div>
 
