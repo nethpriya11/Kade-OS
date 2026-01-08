@@ -1,11 +1,16 @@
 export const printReceipt = (order) => {
-    const receiptWindow = window.open('', '_blank', 'width=300,height=600');
+    // Create a hidden iframe
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
 
-    if (!receiptWindow) {
-        console.warn('Receipt popup blocked');
-        alert('Please allow popups to print receipts');
-        return;
-    }
+    // Get the iframe's document
+    const frameDoc = iframe.contentWindow.document;
 
     const date = new Date().toLocaleString();
     const total = order.total_amount ? parseFloat(order.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00';
@@ -34,19 +39,16 @@ export const printReceipt = (order) => {
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Receipt #${order.id ? order.id.slice(0, 4) : 'OFF'}</title>
+            <title>Receipt</title>
             <style>
                 @page {
                     margin: 0;
                     size: auto;
                 }
-                @media print {
-                    .no-print { display: none; }
-                }
                 body {
                     font-family: 'Courier New', Courier, monospace;
                     width: 280px; /* Standard 80mm printer width approx */
-                    margin: 0 auto;
+                    margin: 0;
                     padding: 10px 0;
                     font-size: 12px;
                     color: black;
@@ -63,7 +65,7 @@ export const printReceipt = (order) => {
                     max-width: 150px;
                     max-height: 80px;
                     margin-bottom: 5px;
-                    filter: grayscale(100%) contrast(150%); /* Optimize for thermal print */
+                    filter: grayscale(100%) contrast(150%);
                 }
                 .shop-name {
                     font-size: 18px;
@@ -137,7 +139,6 @@ export const printReceipt = (order) => {
         </head>
         <body>
             <div class="header">
-                <!-- Ensure logo image exists in public folder -->
                 <img src="/logo.png" class="logo-img" alt="Logo" onerror="this.style.display='none'" />
                 <div class="shop-name">Kade OS Shop</div>
                 <div class="shop-info">123 Street Name, City</div>
@@ -175,34 +176,37 @@ export const printReceipt = (order) => {
                 <p style="font-size: 8px; margin-top: 5px;">Powered by Kade-OS</p>
             </div>
             
-            <div class="footer no-print">
-                <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; cursor: pointer; background: black; color: white; border: none; border-radius: 5px;">Print Receipt</button>
-            </div>
-            
             <script>
-                // Auto-print logic
-                const autoPrint = () => {
+                // Wait for logo to load then print
+                const logo = document.querySelector('.logo-img');
+                
+                const triggerPrint = () => {
                     setTimeout(() => {
                         window.print();
                     }, 500);
                 };
 
-                const logo = document.querySelector('.logo-img');
                 if (logo) {
                     if (logo.complete) {
-                        autoPrint();
+                        triggerPrint();
                     } else {
-                        logo.onload = autoPrint;
-                        logo.onerror = autoPrint;
+                        logo.onload = triggerPrint;
+                        logo.onerror = triggerPrint;
                     }
                 } else {
-                    autoPrint();
+                    triggerPrint();
                 }
             </script>
         </body>
         </html>
     `;
 
-    receiptWindow.document.write(html);
-    receiptWindow.document.close();
+    frameDoc.open();
+    frameDoc.write(html);
+    frameDoc.close();
+
+    // Clean up iframe after printing (give it enough time to be processed by the browser)
+    setTimeout(() => {
+        document.body.removeChild(iframe);
+    }, 60000); // Remove after 1 minute
 };
