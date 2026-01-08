@@ -40,6 +40,9 @@ export const printReceipt = (order) => {
                     margin: 0;
                     size: auto;
                 }
+                @media print {
+                    .no-print { display: none; }
+                }
                 body {
                     font-family: 'Courier New', Courier, monospace;
                     width: 280px; /* Standard 80mm printer width approx */
@@ -172,11 +175,28 @@ export const printReceipt = (order) => {
                 <p style="font-size: 8px; margin-top: 5px;">Powered by Kade-OS</p>
             </div>
             
+            <div class="footer no-print">
+                <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; cursor: pointer; background: black; color: white; border: none; border-radius: 5px;">Print Receipt</button>
+            </div>
+            
             <script>
-                window.onload = function() {
-                    window.print();
-                    // Optional: Close after print
-                    // setTimeout(() => window.close(), 500);
+                // Auto-print logic
+                const autoPrint = () => {
+                    setTimeout(() => {
+                        window.print();
+                    }, 500);
+                };
+
+                const logo = document.querySelector('.logo-img');
+                if (logo) {
+                    if (logo.complete) {
+                        autoPrint();
+                    } else {
+                        logo.onload = autoPrint;
+                        logo.onerror = autoPrint;
+                    }
+                } else {
+                    autoPrint();
                 }
             </script>
         </body>
