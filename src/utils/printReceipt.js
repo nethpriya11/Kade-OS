@@ -51,10 +51,11 @@ export const printReceipt = (order) => {
                 }
                 body {
                     font-family: 'Arial', 'Helvetica', sans-serif;
-                    width: 48mm;
-                    max-width: 48mm;
+                    width: 44mm;
+                    max-width: 44mm;
+                    margin: 0 auto;
                     overflow: hidden;
-                    padding: 2mm 1mm;
+                    padding: 1mm 0;
                     font-size: 11px;
                     color: #000;
                     line-height: 1.3;
@@ -67,10 +68,10 @@ export const printReceipt = (order) => {
                     margin-bottom: 4px;
                 }
                 .logo-img {
-                    width: 100%;
+                    width: 85%;
                     height: auto;
                     margin-bottom: 4px;
-                    filter: grayscale(100%) contrast(150%);
+                    filter: grayscale(100%) contrast(150%) brightness(0.9);
                 }
                 .shop-name {
                     font-size: 14px;
