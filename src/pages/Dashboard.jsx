@@ -32,13 +32,18 @@ const Dashboard = () => {
         orderCount: 0,
         lowStockCount: 0
     });
-    const [loading, setLoading] = useState(true);
 
-    const fetchStats = async () => {
-        // Get start of today in local time, then convert to UTC ISO string
+    async function fetchStats() {
+        // Business day starts at 4 AM local time
         const now = new Date();
-        now.setHours(0, 0, 0, 0);
-        const startOfDay = now.toISOString();
+        let startOfBusinessDay = new Date(now);
+
+        if (now.getHours() < 4) {
+            startOfBusinessDay.setDate(now.getDate() - 1);
+        }
+        startOfBusinessDay.setHours(4, 0, 0, 0);
+
+        const startOfDay = startOfBusinessDay.toISOString();
 
         // Fetch Orders for today
         const { data: orders, error: ordersError } = await supabase
@@ -61,8 +66,7 @@ const Dashboard = () => {
                 lowStockCount: lowStockCount || 0
             });
         }
-        setLoading(false);
-    };
+    }
 
     useEffect(() => {
         fetchStats();

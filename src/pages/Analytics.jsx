@@ -4,7 +4,6 @@ import { TrendingUp, DollarSign, ShoppingBag, AlertTriangle, ArrowUpRight, Arrow
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend } from 'recharts';
 
 const Analytics = () => {
-    const [loading, setLoading] = useState(true);
     const [timeRange, setTimeRange] = useState('today'); // 'today', 'week', 'month'
     const [metrics, setMetrics] = useState({
         revenue: 0,
@@ -40,15 +39,20 @@ const Analytics = () => {
         };
     }, [timeRange]);
 
-    const fetchAnalytics = async () => {
-        setLoading(true);
-
-        // Calculate date range
+    async function fetchAnalytics() {
         const now = new Date();
-        let startDate = new Date();
-        if (timeRange === 'today') startDate.setHours(0, 0, 0, 0);
-        if (timeRange === 'week') startDate.setDate(now.getDate() - 7);
-        if (timeRange === 'month') startDate.setMonth(now.getMonth() - 1);
+        let startDate = new Date(now);
+
+        if (now.getHours() < 4) {
+            startDate.setDate(now.getDate() - 1);
+        }
+        startDate.setHours(4, 0, 0, 0);
+
+        if (timeRange === 'week') {
+            startDate.setDate(startDate.getDate() - 7);
+        } else if (timeRange === 'month') {
+            startDate.setMonth(startDate.getMonth() - 1);
+        }
 
         // Fetch Orders
         const { data: orders } = await supabase
@@ -67,8 +71,7 @@ const Analytics = () => {
             processAnalytics(orders, wastage);
         }
         setOrdersList(orders || []);
-        setLoading(false);
-    };
+    }
 
     const processAnalytics = (orders, wastage) => {
         // 1. Key Metrics

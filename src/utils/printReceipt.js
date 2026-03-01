@@ -12,7 +12,9 @@ export const printReceipt = (order) => {
     // Get the iframe's document
     const frameDoc = iframe.contentWindow.document;
 
-    const date = new Date().toLocaleString();
+    const now = new Date();
+    const dateStr = now.toLocaleDateString();
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const total = order.total_amount ? parseFloat(order.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00';
 
     // Handle both data structures (direct items or nested order_items)
@@ -43,97 +45,104 @@ export const printReceipt = (order) => {
             <style>
                 @page {
                     margin: 0;
-                    size: auto;
+                    size: 58mm auto;
                 }
                 body {
                     font-family: 'Courier New', Courier, monospace;
-                    width: 280px; /* Standard 80mm printer width approx */
-                    margin: 0;
-                    padding: 10px 0;
-                    font-size: 12px;
+                    width: 46mm; /* 58mm paper minus ~6mm margins each side */
+                    margin: 0 auto;
+                    padding: 2mm 0;
+                    font-size: 10px;
                     color: black;
+                    line-height: 1.2;
                 }
+                * { box-sizing: border-box; }
                 .text-center { text-align: center; }
                 .text-right { text-align: right; }
                 .bold { font-weight: bold; }
                 
                 .header {
-                    margin-bottom: 15px;
+                    margin-bottom: 6px;
                     text-align: center;
                 }
                 .logo-img {
-                    max-width: 150px;
-                    max-height: 80px;
-                    margin-bottom: 5px;
-                    filter: grayscale(100%) contrast(150%);
+                    max-width: 120px;
+                    max-height: 60px;
+                    margin-bottom: 3px;
+                    filter: grayscale(100%) contrast(200%) brightness(0.8);
                 }
                 .shop-name {
-                    font-size: 18px;
+                    font-size: 13px;
                     font-weight: bold;
-                    margin: 5px 0;
+                    margin: 3px 0;
                     text-transform: uppercase;
                 }
                 .shop-info {
-                    font-size: 10px;
-                    margin-bottom: 2px;
+                    font-size: 8px;
+                    margin-bottom: 1px;
                 }
                 
                 .divider {
                     border-top: 1px dashed black;
-                    margin: 10px 0;
+                    margin: 5px 0;
                 }
                 
                 .meta {
                     display: flex;
                     justify-content: space-between;
-                    font-size: 10px;
-                    margin-bottom: 5px;
+                    font-size: 8px;
+                    margin-bottom: 3px;
                 }
                 
                 .items {
-                    margin-bottom: 10px;
+                    margin-bottom: 5px;
                 }
                 .item {
-                    margin-bottom: 8px;
+                    margin-bottom: 4px;
                 }
                 .item-row {
                     display: flex;
                     justify-content: flex-start;
                     font-weight: bold;
-                    margin-bottom: 2px;
+                    font-size: 9px;
+                    margin-bottom: 1px;
                 }
                 .qty {
-                    width: 25px;
+                    width: 18px;
+                    flex-shrink: 0;
                 }
                 .name {
                     flex: 1;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
                 }
                 .price-row {
                     display: flex;
                     justify-content: flex-end;
-                    font-size: 10px;
-                    gap: 10px;
+                    font-size: 8px;
+                    gap: 5px;
                 }
                 .price-total {
-                    min-width: 40px;
+                    min-width: 35px;
                     text-align: right;
                 }
                 
                 .totals {
-                    margin-top: 10px;
+                    margin-top: 5px;
                 }
                 .total-row {
                     display: flex;
                     justify-content: space-between;
-                    font-size: 14px;
+                    font-size: 12px;
                     font-weight: bold;
-                    margin-top: 5px;
+                    margin-top: 3px;
                 }
                 
                 .footer {
-                    margin-top: 20px;
+                    margin-top: 10px;
                     text-align: center;
-                    font-size: 10px;
+                    font-size: 8px;
                 }
             </style>
         </head>
@@ -148,8 +157,8 @@ export const printReceipt = (order) => {
             <div class="divider"></div>
             
             <div class="meta">
-                <span>Data: ${date.split(',')[0]}</span>
-                <span>Time: ${date.split(',')[1]}</span>
+                <span>Date: ${dateStr}</span>
+                <span>Time: ${timeStr}</span>
             </div>
             <div class="meta">
                 <span>Order: #${order.id ? order.id.slice(0, 4) : 'OFF'}</span>

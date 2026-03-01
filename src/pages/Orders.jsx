@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const Orders = () => {
     const [orders, setOrders] = useState([]);
-    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         fetchOrders();
@@ -23,7 +22,7 @@ const Orders = () => {
         };
     }, []);
 
-    const fetchOrders = async () => {
+    async function fetchOrders() {
         const { data } = await supabase
             .from('orders')
             .select(`*, order_items (*, menu_items (name))`)
@@ -32,8 +31,7 @@ const Orders = () => {
             .order('created_at', { ascending: true });
 
         if (data) setOrders(data);
-        setLoading(false);
-    };
+    }
 
     const updateStatus = async (id, newStatus) => {
         await supabase.from('orders').update({ status: newStatus }).eq('id', id);
@@ -45,21 +43,26 @@ const Orders = () => {
         if (newStatus === 'completed') {
             const order = orders.find(o => o.id === id);
             if (order && order.order_items) {
+                const deductionPromises = [];
                 for (const item of order.order_items) {
-                    const { data: recipe } = await supabase
-                        .from('recipes')
-                        .select('ingredient_id, quantity_required')
-                        .eq('menu_item_id', item.menu_item_id);
+                    deductionPromises.push((async () => {
+                        const { data: recipe } = await supabase
+                            .from('recipes')
+                            .select('ingredient_id, quantity_required')
+                            .eq('menu_item_id', item.menu_item_id);
 
-                    if (recipe) {
-                        for (const r of recipe) {
-                            await supabase.rpc('decrement_stock', {
-                                row_id: r.ingredient_id,
-                                amount: r.quantity_required * item.quantity
-                            });
+                        if (recipe) {
+                            const rpcPromises = recipe.map(r =>
+                                supabase.rpc('decrement_stock', {
+                                    row_id: r.ingredient_id,
+                                    amount: r.quantity_required * item.quantity
+                                })
+                            );
+                            await Promise.all(rpcPromises);
                         }
-                    }
+                    })());
                 }
+                await Promise.all(deductionPromises);
             }
         }
     };
