@@ -49,12 +49,12 @@ export const printReceipt = (order) => {
                 }
                 body {
                     font-family: 'Courier New', Courier, monospace;
-                    width: 46mm; /* 58mm paper minus ~6mm margins each side */
-                    margin: 0 auto;
-                    padding: 2mm 0;
+                    width: 42mm;
+                    margin: 0;
+                    padding: 1mm 0;
                     font-size: 10px;
                     color: black;
-                    line-height: 1.2;
+                    line-height: 1.1;
                 }
                 * { box-sizing: border-box; }
                 .text-center { text-align: center; }
@@ -62,43 +62,43 @@ export const printReceipt = (order) => {
                 .bold { font-weight: bold; }
                 
                 .header {
-                    margin-bottom: 6px;
+                    margin-bottom: 3px;
                     text-align: center;
                 }
                 .logo-img {
-                    max-width: 120px;
-                    max-height: 60px;
-                    margin-bottom: 3px;
-                    filter: grayscale(100%) contrast(200%) brightness(0.8);
+                    max-width: 140px;
+                    max-height: 70px;
+                    margin-bottom: 2px;
+                    filter: grayscale(100%) contrast(300%) brightness(0.5);
                 }
                 .shop-name {
                     font-size: 13px;
                     font-weight: bold;
-                    margin: 3px 0;
+                    margin: 2px 0;
                     text-transform: uppercase;
                 }
                 .shop-info {
                     font-size: 8px;
-                    margin-bottom: 1px;
+                    margin-bottom: 0;
                 }
                 
                 .divider {
                     border-top: 1px dashed black;
-                    margin: 5px 0;
+                    margin: 3px 0;
                 }
                 
                 .meta {
                     display: flex;
                     justify-content: space-between;
                     font-size: 8px;
-                    margin-bottom: 3px;
+                    margin-bottom: 2px;
                 }
                 
                 .items {
-                    margin-bottom: 5px;
+                    margin-bottom: 3px;
                 }
                 .item {
-                    margin-bottom: 4px;
+                    margin-bottom: 3px;
                 }
                 .item-row {
                     display: flex;
@@ -129,18 +129,18 @@ export const printReceipt = (order) => {
                 }
                 
                 .totals {
-                    margin-top: 5px;
+                    margin-top: 3px;
                 }
                 .total-row {
                     display: flex;
                     justify-content: space-between;
                     font-size: 12px;
                     font-weight: bold;
-                    margin-top: 3px;
+                    margin-top: 2px;
                 }
                 
                 .footer {
-                    margin-top: 10px;
+                    margin-top: 6px;
                     text-align: center;
                     font-size: 8px;
                 }
