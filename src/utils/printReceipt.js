@@ -26,13 +26,10 @@ export const printReceipt = (order) => {
         const itemTotal = price * item.quantity;
         return `
         <div class="item">
-            <div class="item-row">
-                <span class="qty">${item.quantity}</span>
-                <span class="name">${name}</span>
-            </div>
-            <div class="price-row">
-                <span class="price-unit">@ ${price.toLocaleString()}</span>
-                <span class="price-total">${itemTotal.toLocaleString()}</span>
+            <div class="item-name">${item.quantity}x ${name}</div>
+            <div class="item-price">
+                <span>@ ${price.toLocaleString()}</span>
+                <span class="total">${itemTotal.toLocaleString()}</span>
             </div>
         </div>
     `}).join('');
@@ -47,102 +44,98 @@ export const printReceipt = (order) => {
                     margin: 0;
                     size: 58mm auto;
                 }
-                body {
-                    font-family: 'Courier New', Courier, monospace;
-                    width: 42mm;
+                * {
                     margin: 0;
-                    padding: 1mm 0;
-                    font-size: 10px;
-                    color: black;
-                    line-height: 1.1;
+                    padding: 0;
+                    box-sizing: border-box;
                 }
-                * { box-sizing: border-box; }
-                .text-center { text-align: center; }
-                .text-right { text-align: right; }
-                .bold { font-weight: bold; }
-                
+                body {
+                    font-family: 'Arial', 'Helvetica', sans-serif;
+                    width: 48mm;
+                    max-width: 48mm;
+                    overflow: hidden;
+                    padding: 2mm 1mm;
+                    font-size: 11px;
+                    color: #000;
+                    line-height: 1.3;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+
                 .header {
-                    margin-bottom: 3px;
                     text-align: center;
+                    margin-bottom: 4px;
                 }
                 .logo-img {
-                    max-width: 140px;
-                    max-height: 70px;
-                    margin-bottom: 2px;
-                    filter: grayscale(100%) contrast(300%) brightness(0.5);
+                    width: 100%;
+                    height: auto;
+                    margin-bottom: 4px;
+                    filter: grayscale(100%) contrast(150%);
                 }
                 .shop-name {
-                    font-size: 13px;
-                    font-weight: bold;
-                    margin: 2px 0;
+                    font-size: 14px;
+                    font-weight: 900;
+                    letter-spacing: 1px;
                     text-transform: uppercase;
                 }
                 .shop-info {
-                    font-size: 8px;
-                    margin-bottom: 0;
-                }
-                
-                .divider {
-                    border-top: 1px dashed black;
-                    margin: 3px 0;
-                }
-                
-                .meta {
-                    display: flex;
-                    justify-content: space-between;
-                    font-size: 8px;
-                    margin-bottom: 2px;
-                }
-                
-                .items {
-                    margin-bottom: 3px;
-                }
-                .item {
-                    margin-bottom: 3px;
-                }
-                .item-row {
-                    display: flex;
-                    justify-content: flex-start;
-                    font-weight: bold;
                     font-size: 9px;
-                    margin-bottom: 1px;
+                    line-height: 1.4;
                 }
-                .qty {
-                    width: 18px;
-                    flex-shrink: 0;
+
+                .divider {
+                    border: none;
+                    border-top: 1px dashed #000;
+                    margin: 4px 0;
                 }
-                .name {
-                    flex: 1;
+
+                .meta-line {
+                    font-size: 10px;
+                    font-weight: 700;
+                    margin-bottom: 2px;
                     overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
                 }
-                .price-row {
-                    display: flex;
-                    justify-content: flex-end;
-                    font-size: 8px;
-                    gap: 5px;
+                .meta-line .left { float: left; }
+                .meta-line .right { float: right; }
+
+                .item {
+                    margin-bottom: 4px;
                 }
-                .price-total {
-                    min-width: 35px;
+                .item-name {
+                    font-size: 11px;
+                    font-weight: 700;
+                    word-wrap: break-word;
+                }
+                .item-price {
+                    font-size: 10px;
                     text-align: right;
                 }
-                
-                .totals {
-                    margin-top: 3px;
+                .item-price .total {
+                    font-weight: 700;
+                    margin-left: 8px;
                 }
-                .total-row {
-                    display: flex;
-                    justify-content: space-between;
-                    font-size: 12px;
-                    font-weight: bold;
+
+                .total-section {
                     margin-top: 2px;
+                    overflow: hidden;
+                    font-size: 13px;
+                    font-weight: 900;
                 }
-                
+                .total-section .left { float: left; }
+                .total-section .right { float: right; }
+
                 .footer {
                     margin-top: 6px;
                     text-align: center;
-                    font-size: 8px;
+                    font-size: 9px;
+                }
+                .footer p {
+                    margin: 1px 0;
+                }
+                .powered {
+                    font-size: 7px;
+                    margin-top: 3px;
+                    color: #333;
                 }
             </style>
         </head>
@@ -153,58 +146,45 @@ export const printReceipt = (order) => {
                 <div class="shop-info">123 Street Name, City</div>
                 <div class="shop-info">Tel: 011-2345678</div>
             </div>
-            
+
             <div class="divider"></div>
-            
-            <div class="meta">
-                <span>Date: ${dateStr}</span>
-                <span>Time: ${timeStr}</span>
+
+            <div class="meta-line">
+                <span class="left">Date: ${dateStr}</span>
+                <span class="right">Time: ${timeStr}</span>
             </div>
-            <div class="meta">
-                <span>Order: #${order.id ? order.id.slice(0, 4) : 'OFF'}</span>
+            <div class="meta-line">
+                <span class="left">Order: #${order.id ? order.id.slice(0, 4) : 'OFF'}</span>
             </div>
-            
+
             <div class="divider"></div>
-            
+
             <div class="items">
                 ${itemsHtml}
             </div>
-            
+
             <div class="divider"></div>
-            
-            <div class="totals">
-                <div class="total-row">
-                    <span>TOTAL</span>
-                    <span>LKR ${total}</span>
-                </div>
+
+            <div class="total-section">
+                <span class="left">TOTAL</span>
+                <span class="right">LKR ${total}</span>
             </div>
-            
+
             <div class="footer">
                 <p>Thank you for your business!</p>
                 <p>Please come again.</p>
-                <p style="font-size: 8px; margin-top: 5px;">Powered by Kade-OS</p>
+                <p class="powered">Powered by Kade-OS</p>
             </div>
-            
-            <script>
-                // Wait for logo to load then print
-                const logo = document.querySelector('.logo-img');
-                
-                const triggerPrint = () => {
-                    setTimeout(() => {
-                        window.print();
-                    }, 500);
-                };
 
+            <script>
+                const logo = document.querySelector('.logo-img');
+                const triggerPrint = () => {
+                    setTimeout(() => { window.print(); }, 500);
+                };
                 if (logo) {
-                    if (logo.complete) {
-                        triggerPrint();
-                    } else {
-                        logo.onload = triggerPrint;
-                        logo.onerror = triggerPrint;
-                    }
-                } else {
-                    triggerPrint();
-                }
+                    if (logo.complete) { triggerPrint(); }
+                    else { logo.onload = triggerPrint; logo.onerror = triggerPrint; }
+                } else { triggerPrint(); }
             </script>
         </body>
         </html>
