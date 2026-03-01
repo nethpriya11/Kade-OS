@@ -71,7 +71,7 @@ export const printReceipt = (order) => {
                     width: 85%;
                     height: auto;
                     margin-bottom: 4px;
-                    filter: grayscale(100%) contrast(150%) brightness(0.9);
+                    filter: invert(1) grayscale(100%) contrast(150%) brightness(0.9);
                 }
                 .shop-name {
                     font-size: 14px;
@@ -143,9 +143,9 @@ export const printReceipt = (order) => {
         <body>
             <div class="header">
                 <img src="/logo.png" class="logo-img" alt="Logo" onerror="this.style.display='none'" />
-                <div class="shop-name">Kade OS Shop</div>
-                <div class="shop-info">123 Street Name, City</div>
-                <div class="shop-info">Tel: 011-2345678</div>
+                <div class="shop-name">Fast Casual Restaurant</div>
+                <div class="shop-info">96 Leisure, High Level Road, Maharagama</div>
+                <div class="shop-info">Tel: 0777 474 300</div>
             </div>
 
             <div class="divider"></div>
@@ -172,8 +172,8 @@ export const printReceipt = (order) => {
             </div>
 
             <div class="footer">
-                <p>Thank you for your business!</p>
-                <p>Please come again.</p>
+                <p>Thank you for dining with us!</p>
+                <p>We hope to see you again soon.</p>
                 <p class="powered">Powered by Kade-OS</p>
             </div>
 
