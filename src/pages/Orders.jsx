@@ -116,7 +116,9 @@ const Orders = () => {
                                         >
                                             <Printer size={14} />
                                         </button>
-                                        <span className="text-xs font-bold text-primary self-center">Takeout</span>
+                                        <span className="text-xs font-bold text-primary self-center px-2 py-0.5 bg-primary/10 rounded-md uppercase">
+                                            {order.payment_method || 'CASH'}
+                                        </span>
                                     </div>
                                 </div>
                             </div>

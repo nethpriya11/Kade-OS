@@ -12,6 +12,7 @@ const POS = () => {
     const [loading, setLoading] = useState(true);
     const { cart, addToCart, removeFromCart, updateQuantity, clearCart } = useCartStore();
     const { isOnline, addToQueue } = useOfflineStore();
+    const [paymentMethod, setPaymentMethod] = useState('cash');
 
     const [processing, setProcessing] = useState(false);
     const [isCartOpen, setIsCartOpen] = useState(false);
@@ -71,6 +72,7 @@ const POS = () => {
                 addToQueue({
                     items: cart,
                     total_amount: totalAmount,
+                    payment_method: paymentMethod,
                     created_at: new Date().toISOString()
                 });
 
@@ -79,6 +81,7 @@ const POS = () => {
                     id: `OFF-${Date.now().toString().slice(-4)}`, // Temporary ID
                     created_at: new Date().toISOString(),
                     total_amount: totalAmount,
+                    payment_method: paymentMethod,
                     order_items: cart.map(item => ({
                         quantity: item.quantity,
                         price_at_time: item.price,
@@ -98,6 +101,7 @@ const POS = () => {
                 .from('orders')
                 .insert([{
                     total_amount: totalAmount,
+                    payment_method: paymentMethod,
                     status: 'pending'
                 }])
                 .select()
@@ -398,6 +402,21 @@ const POS = () => {
                             <div className="flex justify-between items-center mb-6">
                                 <span className="text-text-muted font-medium">Total Amount</span>
                                 <span className="text-3xl font-bold text-primary">LKR {cart.reduce((sum, i) => sum + (i.price * i.quantity), 0).toLocaleString()}</span>
+                            </div>
+
+                            <div className="flex gap-4 mb-6">
+                                <button
+                                    onClick={() => setPaymentMethod('cash')}
+                                    className={`flex-1 py-3 rounded-xl font-bold transition-all border ${paymentMethod === 'cash' ? 'bg-primary/20 text-primary border-primary' : 'bg-surface border-border text-text-muted hover:border-text-muted'}`}
+                                >
+                                    Cash
+                                </button>
+                                <button
+                                    onClick={() => setPaymentMethod('card')}
+                                    className={`flex-1 py-3 rounded-xl font-bold transition-all border ${paymentMethod === 'card' ? 'bg-primary/20 text-primary border-primary' : 'bg-surface border-border text-text-muted hover:border-text-muted'}`}
+                                >
+                                    Card
+                                </button>
                             </div>
 
                             <button

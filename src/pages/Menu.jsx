@@ -20,6 +20,7 @@ const Menu = () => {
     const [editingLargePrice, setEditingLargePrice] = useState(false);
     const [editLargePrice, setEditLargePrice] = useState('');
     const [hasPortions, setHasPortions] = useState(false);
+    const [isAvailable, setIsAvailable] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All');
 
@@ -45,6 +46,7 @@ const Menu = () => {
             setEditCategory(selectedItem.category); // Initialize edit category
             setEditCost(selectedItem.cost || 0); // Initialize edit cost
             setHasPortions(selectedItem.has_portions || false); // Initialize has portions
+            setIsAvailable(selectedItem.is_available !== false); // Initialize is available (default true)
             setEditLargePrice(selectedItem.large_price || ''); // Initialize edit large price
         }
     }, [selectedItem]);
@@ -191,6 +193,44 @@ const Menu = () => {
             setHasPortions(newValue);
             setSelectedItem({ ...selectedItem, has_portions: newValue });
             fetchData();
+        }
+    };
+
+    // Toggle Is Available
+    const toggleIsAvailable = async () => {
+        if (!selectedItem) return;
+        const newValue = !isAvailable;
+
+        const { error } = await supabase
+            .from('menu_items')
+            .update({ is_available: newValue })
+            .eq('id', selectedItem.id);
+
+        if (!error) {
+            setIsAvailable(newValue);
+            setSelectedItem({ ...selectedItem, is_available: newValue });
+            fetchData();
+        }
+    };
+
+    // Delete Menu Item
+    const deleteMenuItem = async () => {
+        if (!selectedItem) return;
+
+        if (!window.confirm(`Are you sure you want to delete ${selectedItem.name}?`)) return;
+
+        // Delete from Supabase
+        const { error } = await supabase
+            .from('menu_items')
+            .delete()
+            .eq('id', selectedItem.id);
+
+        if (!error) {
+            setSelectedItem(null);
+            fetchData();
+        } else {
+            console.error('Error deleting item:', error);
+            alert('Cannot delete item. It may be linked to existing orders. Try making it unavailable instead (if applicable).');
         }
     };
 
@@ -470,6 +510,18 @@ const Menu = () => {
                                         <label htmlFor="edit_has_portions" className="text-text-muted text-sm cursor-pointer ml-1">Has Portions</label>
                                     </div>
 
+                                    {/* Is Available check */}
+                                    <div className="flex items-center gap-2 bg-surface px-3 py-1 rounded-lg border border-border">
+                                        <input
+                                            type="checkbox"
+                                            id="edit_is_available"
+                                            checked={isAvailable}
+                                            onChange={toggleIsAvailable}
+                                            className="w-4 h-4 text-primary border-border bg-bg rounded"
+                                        />
+                                        <label htmlFor="edit_is_available" className="text-text-muted text-sm cursor-pointer ml-1">Available</label>
+                                    </div>
+
                                     {hasPortions && (
                                         <div className="flex items-center gap-2 bg-surface px-3 py-1 rounded-lg border border-border">
                                             <span className="text-text-muted">Large Price:</span>
@@ -597,7 +649,14 @@ const Menu = () => {
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="p-4 border-t border-border bg-bg/50 rounded-b-3xl flex justify-end">
+                        <div className="p-4 border-t border-border bg-bg/50 rounded-b-3xl flex justify-between items-center">
+                            <button
+                                onClick={deleteMenuItem}
+                                className="px-4 py-2 text-red-500 hover:bg-red-500/10 font-bold rounded-xl transition-colors flex items-center gap-2"
+                            >
+                                <Trash2 size={20} />
+                                Delete Item
+                            </button>
                             <button
                                 onClick={() => setSelectedItem(null)}
                                 className="px-6 py-3 bg-primary text-bg font-bold rounded-xl hover:opacity-90 transition-opacity"

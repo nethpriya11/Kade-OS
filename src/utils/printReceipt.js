@@ -155,11 +155,12 @@ export const printReceipt = (order) => {
                 <span class="left">Date: ${dateStr}</span>
                 <span class="right">Time: ${timeStr}</span>
             </div>
-            <div class="meta-line">
-                <span class="left">Order: #${order.id ? order.id.slice(0, 4) : 'OFF'}</span>
+            <div className="meta-line">
+                <span className="left">Order: #${order.id ? order.id.slice(0, 4) : 'OFF'}</span>
+                <span className="right">Payment: ${(order.payment_method || 'CASH').toUpperCase()}</span>
             </div>
 
-            <div class="divider"></div>
+            <div className="divider"></div>
 
             <div class="items">
                 ${itemsHtml}

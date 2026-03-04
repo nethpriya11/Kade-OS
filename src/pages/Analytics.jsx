@@ -312,8 +312,9 @@ const Analytics = () => {
                                                         ))}
                                                     </div>
                                                 </td>
-                                                <td className="py-4 text-right font-bold text-primary">
-                                                    LKR {order.total_amount.toLocaleString()}
+                                                <td className="py-4 text-right">
+                                                    <div className="font-bold text-primary">LKR {order.total_amount.toLocaleString()}</div>
+                                                    <div className="text-xs text-text-muted mt-1 uppercase font-semibold">{order.payment_method || 'CASH'}</div>
                                                 </td>
                                             </tr>
                                         ))
