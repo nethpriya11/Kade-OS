@@ -21,7 +21,8 @@ export const printReceipt = (order) => {
     const items = order.order_items || [];
 
     const itemsHtml = items.map(item => {
-        const name = item.menu_items ? item.menu_items.name : item.name;
+        const baseName = item.menu_items ? item.menu_items.name : item.name;
+        const name = item.portion === 'large' ? `${baseName} (Large)` : baseName;
         const price = item.price_at_time || 0;
         const itemTotal = price * item.quantity;
         return `

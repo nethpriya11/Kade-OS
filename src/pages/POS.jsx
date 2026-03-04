@@ -17,8 +17,22 @@ const POS = () => {
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedItemForPortion, setSelectedItemForPortion] = useState(null);
 
     const categories = ['All', 'Base', 'Protein', 'Drink', 'Extra'];
+
+    const handleAddPortionItem = (item, portionType) => {
+        const price = portionType === 'large' ? item.large_price : item.price;
+        addToCart({
+            ...item,
+            cartItemId: `${item.id}-${portionType}`,
+            original_id: item.id,
+            price: price,
+            portion: portionType,
+        });
+        toast.success(`Added ${item.name} (${portionType})`);
+        setSelectedItemForPortion(null);
+    };
 
     const filteredItems = menuItems.filter(item => {
         const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
@@ -68,7 +82,8 @@ const POS = () => {
                     order_items: cart.map(item => ({
                         quantity: item.quantity,
                         price_at_time: item.price,
-                        menu_items: { name: item.name }
+                        menu_items: { name: item.name },
+                        portion: item.portion || 'normal'
                     }))
                 });
 
@@ -93,9 +108,10 @@ const POS = () => {
             // 2. Create Order Items
             const orderItems = cart.map(item => ({
                 order_id: order.id,
-                menu_item_id: item.id,
+                menu_item_id: item.original_id || item.id,
                 quantity: item.quantity,
-                price_at_time: item.price
+                price_at_time: item.price,
+                portion: item.portion || 'normal'
             }));
 
             const { error: itemsError } = await supabase
@@ -113,7 +129,8 @@ const POS = () => {
                 order_items: cart.map(item => ({
                     quantity: item.quantity,
                     price_at_time: item.price,
-                    menu_items: { name: item.name }
+                    menu_items: { name: item.name },
+                    portion: item.portion || 'normal'
                 }))
             });
 
@@ -215,8 +232,12 @@ const POS = () => {
                                     whileHover={{ scale: 1.02, y: -2 }}
                                     whileTap={{ scale: 0.98 }}
                                     onClick={() => {
-                                        addToCart(item);
-                                        toast.success(`Added ${item.name}`);
+                                        if (item.has_portions) {
+                                            setSelectedItemForPortion(item);
+                                        } else {
+                                            addToCart({ ...item, cartItemId: item.id, original_id: item.id, portion: 'normal' });
+                                            toast.success(`Added ${item.name}`);
+                                        }
                                     }}
                                     className="glass p-4 md:p-5 rounded-2xl hover:bg-surface-hover hover:border-primary/50 transition-all text-left group relative overflow-hidden h-full flex flex-col justify-between"
                                 >
@@ -276,6 +297,49 @@ const POS = () => {
                 )}
             </AnimatePresence>
 
+            {/* Portion Selection Modal */}
+            {selectedItemForPortion && (
+                <>
+                    <div
+                        onClick={() => setSelectedItemForPortion(null)}
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998]"
+                    />
+                    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface border border-border rounded-3xl p-6 shadow-2xl z-[9999] w-full max-w-sm animate-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-bold text-text">Select Portion Size</h2>
+                            <button
+                                onClick={() => setSelectedItemForPortion(null)}
+                                className="p-2 hover:bg-surface-hover rounded-full text-text-muted"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="space-y-4">
+                            <button
+                                onClick={() => handleAddPortionItem(selectedItemForPortion, 'normal')}
+                                className="w-full bg-surface-hover border border-border hover:border-primary p-4 rounded-xl text-left transition-colors flex justify-between items-center"
+                            >
+                                <div>
+                                    <div className="font-bold text-text">Normal</div>
+                                    <div className="text-sm text-text-muted">{selectedItemForPortion.name}</div>
+                                </div>
+                                <div className="font-bold text-primary">LKR {selectedItemForPortion.price}</div>
+                            </button>
+                            <button
+                                onClick={() => handleAddPortionItem(selectedItemForPortion, 'large')}
+                                className="w-full bg-surface-hover border border-border hover:border-primary p-4 rounded-xl text-left transition-colors flex justify-between items-center"
+                            >
+                                <div>
+                                    <div className="font-bold text-text">Large</div>
+                                    <div className="text-sm text-text-muted">{selectedItemForPortion.name}</div>
+                                </div>
+                                <div className="font-bold text-primary">LKR {selectedItemForPortion.large_price || 0}</div>
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
+
             {/* Cart Drawer Overlay */}
             {/* Cart Drawer */}
             {isCartOpen && (
@@ -310,17 +374,19 @@ const POS = () => {
                                 <div className="space-y-4">
                                     {cart.map(item => (
                                         <div
-                                            key={item.id}
+                                            key={item.cartItemId || item.id}
                                             className="flex justify-between items-center bg-bg p-4 rounded-2xl border border-border"
                                         >
                                             <div>
-                                                <div className="font-bold text-text">{item.name}</div>
+                                                <div className="font-bold text-text">
+                                                    {item.name} {item.portion === 'large' && <span className="text-xs ml-1 text-primary">(Large)</span>}
+                                                </div>
                                                 <div className="text-sm text-primary font-medium">LKR {item.price * item.quantity}</div>
                                             </div>
                                             <div className="flex items-center gap-3 bg-surface rounded-xl p-1 border border-border">
-                                                <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="p-2 hover:text-primary hover:bg-bg rounded-lg transition-colors"><Minus size={16} /></button>
+                                                <button onClick={() => updateQuantity(item.cartItemId || item.id, item.quantity - 1)} className="p-2 hover:text-primary hover:bg-bg rounded-lg transition-colors"><Minus size={16} /></button>
                                                 <span className="font-bold w-6 text-center">{item.quantity}</span>
-                                                <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="p-2 hover:text-primary hover:bg-bg rounded-lg transition-colors"><Plus size={16} /></button>
+                                                <button onClick={() => updateQuantity(item.cartItemId || item.id, item.quantity + 1)} className="p-2 hover:text-primary hover:bg-bg rounded-lg transition-colors"><Plus size={16} /></button>
                                             </div>
                                         </div>
                                     ))}

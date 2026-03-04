@@ -10,13 +10,16 @@ const Menu = () => {
     const [recipe, setRecipe] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
-    const [newItem, setNewItem] = useState({ name: '', category: 'Base', price: '' });
+    const [newItem, setNewItem] = useState({ name: '', category: 'Base', price: '', has_portions: false, large_price: '' });
     const [editingPrice, setEditingPrice] = useState(false);
     const [editPrice, setEditPrice] = useState('');
     const [editingCategory, setEditingCategory] = useState(false);
     const [editCategory, setEditCategory] = useState('');
     const [editingCost, setEditingCost] = useState(false);
     const [editCost, setEditCost] = useState('');
+    const [editingLargePrice, setEditingLargePrice] = useState(false);
+    const [editLargePrice, setEditLargePrice] = useState('');
+    const [hasPortions, setHasPortions] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All');
 
@@ -41,6 +44,8 @@ const Menu = () => {
             setEditPrice(selectedItem.price); // Initialize edit price
             setEditCategory(selectedItem.category); // Initialize edit category
             setEditCost(selectedItem.cost || 0); // Initialize edit cost
+            setHasPortions(selectedItem.has_portions || false); // Initialize has portions
+            setEditLargePrice(selectedItem.large_price || ''); // Initialize edit large price
         }
     }, [selectedItem]);
 
@@ -57,15 +62,20 @@ const Menu = () => {
     const handleCreateItem = async () => {
         if (!newItem.name || !newItem.price) return;
 
+        const insertData = { ...newItem, is_available: true };
+        if (!insertData.has_portions) {
+            insertData.large_price = 0;
+        }
+
         const { data, error } = await supabase
             .from('menu_items')
-            .insert([{ ...newItem, is_available: true }])
+            .insert([insertData])
             .select()
             .single();
 
         if (!error) {
             setIsCreating(false);
-            setNewItem({ name: '', category: 'Base', price: '' });
+            setNewItem({ name: '', category: 'Base', price: '', has_portions: false, large_price: '' });
             fetchData();
             setSelectedItem(data); // Auto-open the new item modal
         }
@@ -148,6 +158,39 @@ const Menu = () => {
             setSelectedItem({ ...selectedItem, cost: editCost });
             setEditingCost(false);
             fetchData(); // Refresh list
+        }
+    };
+
+    // Update Menu Item Large Price
+    const updateLargePrice = async () => {
+        if (editLargePrice === '' || !selectedItem) return;
+
+        const { error } = await supabase
+            .from('menu_items')
+            .update({ large_price: editLargePrice })
+            .eq('id', selectedItem.id);
+
+        if (!error) {
+            setSelectedItem({ ...selectedItem, large_price: editLargePrice });
+            setEditingLargePrice(false);
+            fetchData();
+        }
+    };
+
+    // Toggle Has Portions
+    const toggleHasPortions = async () => {
+        if (!selectedItem) return;
+        const newValue = !hasPortions;
+
+        const { error } = await supabase
+            .from('menu_items')
+            .update({ has_portions: newValue })
+            .eq('id', selectedItem.id);
+
+        if (!error) {
+            setHasPortions(newValue);
+            setSelectedItem({ ...selectedItem, has_portions: newValue });
+            fetchData();
         }
     };
 
@@ -288,7 +331,7 @@ const Menu = () => {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-text-muted text-sm font-bold mb-1">Selling Price (LKR)</label>
+                                <label className="block text-text-muted text-sm font-bold mb-1">Selling Price {newItem.has_portions ? '(Normal)' : ''} (LKR)</label>
                                 <input
                                     type="number"
                                     value={newItem.price}
@@ -297,6 +340,28 @@ const Menu = () => {
                                     placeholder="0.00"
                                 />
                             </div>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="checkbox"
+                                    id="has_portions_create"
+                                    checked={newItem.has_portions}
+                                    onChange={(e) => setNewItem({ ...newItem, has_portions: e.target.checked })}
+                                    className="w-5 h-5 text-primary border-border bg-bg rounded-lg"
+                                />
+                                <label htmlFor="has_portions_create" className="text-text font-bold">Has Portion Sizes (Normal/Large)</label>
+                            </div>
+                            {newItem.has_portions && (
+                                <div>
+                                    <label className="block text-text-muted text-sm font-bold mb-1">Large Portion Price (LKR)</label>
+                                    <input
+                                        type="number"
+                                        value={newItem.large_price}
+                                        onChange={e => setNewItem({ ...newItem, large_price: e.target.value })}
+                                        className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
+                                        placeholder="0.00"
+                                    />
+                                </div>
+                            )}
                             <button
                                 onClick={handleCreateItem}
                                 className="w-full py-4 bg-primary text-bg font-bold rounded-xl hover:opacity-90 transition-opacity mt-4"
@@ -392,6 +457,44 @@ const Menu = () => {
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Has portions check */}
+                                    <div className="flex items-center gap-2 bg-surface px-3 py-1 rounded-lg border border-border">
+                                        <input
+                                            type="checkbox"
+                                            id="edit_has_portions"
+                                            checked={hasPortions}
+                                            onChange={toggleHasPortions}
+                                            className="w-4 h-4 text-primary border-border bg-bg rounded"
+                                        />
+                                        <label htmlFor="edit_has_portions" className="text-text-muted text-sm cursor-pointer ml-1">Has Portions</label>
+                                    </div>
+
+                                    {hasPortions && (
+                                        <div className="flex items-center gap-2 bg-surface px-3 py-1 rounded-lg border border-border">
+                                            <span className="text-text-muted">Large Price:</span>
+                                            {editingLargePrice ? (
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="number"
+                                                        value={editLargePrice}
+                                                        onChange={(e) => setEditLargePrice(e.target.value)}
+                                                        className="bg-bg border border-primary rounded px-2 py-0.5 w-20 text-text font-bold focus:outline-none"
+                                                        autoFocus
+                                                    />
+                                                    <button onClick={updateLargePrice} className="text-green-400 hover:text-green-300"><Check size={16} /></button>
+                                                    <button onClick={() => setEditingLargePrice(false)} className="text-red-400 hover:text-red-300"><X size={16} /></button>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-text font-bold">LKR {selectedItem.large_price || 0}</span>
+                                                    <button onClick={() => { setEditingLargePrice(true); setEditLargePrice(selectedItem.large_price || 0); }} className="text-text-muted hover:text-primary">
+                                                        <Edit2 size={14} />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
                                     <span className={`font-bold px-3 py-1 rounded-lg border ${grossMargin > 50
                                         ? 'bg-secondary/10 text-secondary border-secondary/20'

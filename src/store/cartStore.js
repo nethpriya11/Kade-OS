@@ -3,22 +3,23 @@ import { create } from 'zustand';
 export const useCartStore = create((set) => ({
     cart: [],
     addToCart: (item) => set((state) => {
-        const existingItem = state.cart.find((i) => i.id === item.id);
+        const cartItemId = item.cartItemId || item.id;
+        const existingItem = state.cart.find((i) => (i.cartItemId || i.id) === cartItemId);
         if (existingItem) {
             return {
                 cart: state.cart.map((i) =>
-                    i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+                    (i.cartItemId || i.id) === cartItemId ? { ...i, quantity: i.quantity + 1 } : i
                 ),
             };
         }
-        return { cart: [...state.cart, { ...item, quantity: 1 }] };
+        return { cart: [...state.cart, { ...item, quantity: 1, cartItemId }] };
     }),
-    removeFromCart: (itemId) => set((state) => ({
-        cart: state.cart.filter((i) => i.id !== itemId),
+    removeFromCart: (cartItemId) => set((state) => ({
+        cart: state.cart.filter((i) => (i.cartItemId || i.id) !== cartItemId),
     })),
-    updateQuantity: (itemId, quantity) => set((state) => ({
+    updateQuantity: (cartItemId, quantity) => set((state) => ({
         cart: state.cart.map((i) =>
-            i.id === itemId ? { ...i, quantity: Math.max(0, quantity) } : i
+            (i.cartItemId || i.id) === cartItemId ? { ...i, quantity: Math.max(0, quantity) } : i
         ).filter((i) => i.quantity > 0),
     })),
     clearCart: () => set({ cart: [] }),

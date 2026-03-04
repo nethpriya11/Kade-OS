@@ -1,0 +1,6 @@
+ALTER TABLE public.menu_items 
+ADD COLUMN IF NOT EXISTS has_portions BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS large_price NUMERIC DEFAULT 0;
+
+ALTER TABLE public.order_items
+ADD COLUMN IF NOT EXISTS portion TEXT DEFAULT 'normal';
