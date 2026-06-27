@@ -22,6 +22,7 @@ const POS = () => {
     const [selectedItemForPortion, setSelectedItemForPortion] = useState(null);
 
     // Order Meta States
+    const [orderType, setOrderType] = useState('takeaway'); // 'takeaway' | 'dine_in'
     const [selectedTableNumber, setSelectedTableNumber] = useState('');
     const [customerName, setCustomerName] = useState('');
     const [discountType, setDiscountType] = useState('none'); // 'none', 'percent', 'flat'
@@ -211,6 +212,7 @@ const POS = () => {
             });
 
             clearCart();
+            setOrderType('takeaway');
             setSelectedTableNumber('');
             setCustomerName('');
             setDiscountType('none');
@@ -498,7 +500,33 @@ const POS = () => {
                                     {/* Order Details (Table, Customer, Discounts) */}
                                     <div className="border-t border-border/50 pt-4 mt-6 space-y-4">
                                         <h3 className="text-sm font-bold text-text uppercase tracking-wider">Order Details</h3>
-                                        <div className="grid grid-cols-2 gap-3">
+
+                                        {/* Order Type Toggle */}
+                                        <div>
+                                            <label className="text-xs font-bold text-text-muted uppercase mb-1.5 block">Order Type</label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {['takeaway', 'dine_in'].map((type) => (
+                                                    <button
+                                                        key={type}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setOrderType(type);
+                                                            if (type === 'takeaway') setSelectedTableNumber('');
+                                                        }}
+                                                        className={`py-2.5 rounded-xl text-sm font-bold transition-all border ${
+                                                            orderType === type
+                                                                ? 'bg-primary/20 text-primary border-primary'
+                                                                : 'bg-bg border-border text-text-muted hover:border-text-muted'
+                                                        }`}
+                                                    >
+                                                        {type === 'takeaway' ? '🥡 Takeaway' : '🍽 Dine In'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Table picker – only when Dine In */}
+                                        {orderType === 'dine_in' && (
                                             <div>
                                                 <label className="text-xs font-bold text-text-muted uppercase mb-1 block">Table</label>
                                                 <select
@@ -506,24 +534,26 @@ const POS = () => {
                                                     onChange={(e) => setSelectedTableNumber(e.target.value)}
                                                     className="w-full bg-bg border border-border rounded-xl px-3 py-2.5 text-text focus:outline-none focus:border-primary transition-colors text-sm"
                                                 >
-                                                    <option value="">Takeaway / Counter</option>
+                                                    <option value="">Select a table...</option>
                                                     {tables.map(t => (
                                                         <option key={t.id} value={t.table_number} disabled={t.status === 'occupied'}>
-                                                            Table {t.table_number} ({t.status === 'occupied' ? 'Occupied' : 'Free'})
+                                                            Table {t.table_number} — {t.capacity} seats ({t.status === 'occupied' ? 'Occupied' : 'Free'})
                                                         </option>
                                                     ))}
                                                 </select>
                                             </div>
-                                            <div>
-                                                <label className="text-xs font-bold text-text-muted uppercase mb-1 block">Customer</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="Name"
-                                                    value={customerName}
-                                                    onChange={(e) => setCustomerName(e.target.value)}
-                                                    className="w-full bg-bg border border-border rounded-xl px-3 py-2.5 text-text focus:outline-none focus:border-primary transition-colors text-sm"
-                                                />
-                                            </div>
+                                        )}
+
+                                        {/* Customer Name */}
+                                        <div>
+                                            <label className="text-xs font-bold text-text-muted uppercase mb-1 block">Customer Name <span className="normal-case text-text-muted/60">(optional)</span></label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. John"
+                                                value={customerName}
+                                                onChange={(e) => setCustomerName(e.target.value)}
+                                                className="w-full bg-bg border border-border rounded-xl px-3 py-2.5 text-text focus:outline-none focus:border-primary transition-colors text-sm"
+                                            />
                                         </div>
 
                                         <div>
