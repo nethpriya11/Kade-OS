@@ -9,6 +9,7 @@ import { printReceipt } from '../utils/printReceipt';
 
 const POS = () => {
     const [menuItems, setMenuItems] = useState([]);
+    const [tables, setTables] = useState([]);
     const [loading, setLoading] = useState(true);
     const { cart, addToCart, removeFromCart, updateQuantity, clearCart } = useCartStore();
     const { isOnline, addToQueue } = useOfflineStore();
@@ -19,6 +20,12 @@ const POS = () => {
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedItemForPortion, setSelectedItemForPortion] = useState(null);
+
+    // Order Meta States
+    const [selectedTableNumber, setSelectedTableNumber] = useState('');
+    const [customerName, setCustomerName] = useState('');
+    const [discountType, setDiscountType] = useState('none'); // 'none', 'percent', 'flat'
+    const [discountValue, setDiscountValue] = useState('');
 
     const categories = ['All', 'Base', 'Protein', 'Drink', 'Extra'];
 
@@ -43,16 +50,38 @@ const POS = () => {
 
     useEffect(() => {
         fetchMenu();
+        fetchTables();
+
+        // Subscribe to real-time table status updates
+        const subscription = supabase
+            .channel('pos_tables_realtime')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_tables' }, () => {
+                fetchTables();
+            })
+            .subscribe();
+
+        return () => {
+            subscription.unsubscribe();
+        };
     }, []);
 
     const fetchMenu = async () => {
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from('menu_items')
             .select('*')
             .eq('is_available', true)
             .order('category', { ascending: true });
 
         if (data) setMenuItems(data);
+    };
+
+    const fetchTables = async () => {
+        const { data } = await supabase
+            .from('restaurant_tables')
+            .select('*')
+            .order('table_number');
+
+        if (data) setTables(data);
         setLoading(false);
     };
 
@@ -65,7 +94,22 @@ const POS = () => {
         setProcessing(true);
 
         try {
-            const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            let discountAmount = 0;
+            if (discountType === 'percent' && discountValue) {
+                discountAmount = parseFloat(discountValue);
+            } else if (discountType === 'flat' && discountValue) {
+                discountAmount = parseFloat(discountValue);
+            }
+
+            let discountLkr = 0;
+            if (discountType === 'percent') {
+                discountLkr = subtotal * (discountAmount / 100);
+            } else if (discountType === 'flat') {
+                discountLkr = discountAmount;
+            }
+
+            const totalAmount = Math.max(0, subtotal - discountLkr);
 
             if (!isOnline) {
                 // OFFLINE FLOW
@@ -73,7 +117,11 @@ const POS = () => {
                     items: cart,
                     total_amount: totalAmount,
                     payment_method: paymentMethod,
-                    created_at: new Date().toISOString()
+                    created_at: new Date().toISOString(),
+                    discount_amount: discountAmount > 0 ? discountAmount : null,
+                    discount_type: discountType !== 'none' ? discountType : null,
+                    table_number: selectedTableNumber ? parseInt(selectedTableNumber) : null,
+                    customer_name: customerName || null
                 });
 
                 toast.success('Order saved offline! Will sync when online.');
@@ -82,6 +130,10 @@ const POS = () => {
                     created_at: new Date().toISOString(),
                     total_amount: totalAmount,
                     payment_method: paymentMethod,
+                    discount_amount: discountAmount > 0 ? discountAmount : null,
+                    discount_type: discountType !== 'none' ? discountType : null,
+                    table_number: selectedTableNumber ? parseInt(selectedTableNumber) : null,
+                    customer_name: customerName || null,
                     order_items: cart.map(item => ({
                         quantity: item.quantity,
                         price_at_time: item.price,
@@ -91,6 +143,10 @@ const POS = () => {
                 });
 
                 clearCart();
+                setSelectedTableNumber('');
+                setCustomerName('');
+                setDiscountType('none');
+                setDiscountValue('');
                 setProcessing(false);
                 return;
             }
@@ -102,12 +158,28 @@ const POS = () => {
                 .insert([{
                     total_amount: totalAmount,
                     payment_method: paymentMethod,
-                    status: 'pending'
+                    status: 'pending',
+                    discount_amount: discountAmount > 0 ? discountAmount : null,
+                    discount_type: discountType !== 'none' ? discountType : null,
+                    table_number: selectedTableNumber ? parseInt(selectedTableNumber) : null,
+                    customer_name: customerName || null
                 }])
                 .select()
                 .single();
 
             if (orderError) throw orderError;
+
+            // Update restaurant table status to occupied and link to order ID if table selected
+            if (selectedTableNumber) {
+                await supabase
+                    .from('restaurant_tables')
+                    .update({
+                        status: 'occupied',
+                        current_order_id: order.id,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('table_number', parseInt(selectedTableNumber));
+            }
 
             // 2. Create Order Items
             const orderItems = cart.map(item => ({
@@ -139,6 +211,10 @@ const POS = () => {
             });
 
             clearCart();
+            setSelectedTableNumber('');
+            setCustomerName('');
+            setDiscountType('none');
+            setDiscountValue('');
         } catch (error) {
             console.error('Checkout error:', error);
             toast.error('Failed to place order. Please try again.');
@@ -148,6 +224,18 @@ const POS = () => {
     };
 
 
+
+    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    let discountLkr = 0;
+    const discountValNum = parseFloat(discountValue);
+    if (!isNaN(discountValNum)) {
+        if (discountType === 'percent') {
+            discountLkr = subtotal * (discountValNum / 100);
+        } else if (discountType === 'flat') {
+            discountLkr = discountValNum;
+        }
+    }
+    const totalAmount = Math.max(0, subtotal - discountLkr);
 
     const container = {
         hidden: { opacity: 0 },
@@ -243,23 +331,35 @@ const POS = () => {
                                             toast.success(`Added ${item.name}`);
                                         }
                                     }}
-                                    className="glass p-4 md:p-5 rounded-2xl hover:bg-surface-hover hover:border-primary/50 transition-all text-left group relative overflow-hidden h-full flex flex-col justify-between"
+                                    className="glass rounded-2xl hover:bg-surface-hover hover:border-primary/50 transition-all text-left group relative overflow-hidden h-full flex flex-col justify-between"
                                 >
                                     <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    <div className="relative z-10 w-full">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div className="font-bold text-lg text-text group-hover:text-primary leading-tight">{item.name}</div>
-                                            {item.category && (
-                                                <span className="text-[10px] uppercase tracking-wider font-bold text-text-muted bg-bg/50 px-2 py-1 rounded-md">
+                                    {item.image_url && (
+                                        <div className="h-28 w-full overflow-hidden relative">
+                                            <img src={item.image_url} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                        </div>
+                                    )}
+                                    <div className="p-4 md:p-5 relative z-10 w-full flex-1 flex flex-col justify-between">
+                                        <div>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="font-bold text-base text-text group-hover:text-primary leading-tight truncate">{item.name}</div>
+                                                {item.category && !item.image_url && (
+                                                    <span className="text-[10px] uppercase tracking-wider font-bold text-text-muted bg-bg/50 px-2 py-1 rounded-md">
+                                                        {item.category}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="text-sm text-text-muted font-medium">LKR {item.price}</div>
+                                        </div>
+                                        <div className="relative z-10 mt-3 flex justify-between items-center">
+                                            {item.category && item.image_url ? (
+                                                <span className="text-[9px] uppercase tracking-wider font-bold text-text-muted bg-bg/50 px-2 py-0.5 rounded-md">
                                                     {item.category}
                                                 </span>
-                                            )}
-                                        </div>
-                                        <div className="text-sm text-text-muted font-medium">LKR {item.price}</div>
-                                    </div>
-                                    <div className="relative z-10 mt-3 flex justify-end">
-                                        <div className="bg-surface p-2 rounded-full text-primary opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">
-                                            <Plus size={16} />
+                                            ) : <div />}
+                                            <div className="bg-surface p-2 rounded-full text-primary opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">
+                                                <Plus size={16} />
+                                            </div>
                                         </div>
                                     </div>
                                 </motion.button>
@@ -294,7 +394,7 @@ const POS = () => {
                                 </div>
                             </div>
                             <div className="font-bold text-xl">
-                                LKR {cart.reduce((sum, item) => sum + (item.price * item.quantity), 0).toLocaleString()}
+                                LKR {totalAmount.toLocaleString()}
                             </div>
                         </button>
                     </motion.div>
@@ -394,14 +494,92 @@ const POS = () => {
                                             </div>
                                         </div>
                                     ))}
+
+                                    {/* Order Details (Table, Customer, Discounts) */}
+                                    <div className="border-t border-border/50 pt-4 mt-6 space-y-4">
+                                        <h3 className="text-sm font-bold text-text uppercase tracking-wider">Order Details</h3>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="text-xs font-bold text-text-muted uppercase mb-1 block">Table</label>
+                                                <select
+                                                    value={selectedTableNumber}
+                                                    onChange={(e) => setSelectedTableNumber(e.target.value)}
+                                                    className="w-full bg-bg border border-border rounded-xl px-3 py-2.5 text-text focus:outline-none focus:border-primary transition-colors text-sm"
+                                                >
+                                                    <option value="">Takeaway / Counter</option>
+                                                    {tables.map(t => (
+                                                        <option key={t.id} value={t.table_number} disabled={t.status === 'occupied'}>
+                                                            Table {t.table_number} ({t.status === 'occupied' ? 'Occupied' : 'Free'})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-text-muted uppercase mb-1 block">Customer</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Name"
+                                                    value={customerName}
+                                                    onChange={(e) => setCustomerName(e.target.value)}
+                                                    className="w-full bg-bg border border-border rounded-xl px-3 py-2.5 text-text focus:outline-none focus:border-primary transition-colors text-sm"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs font-bold text-text-muted uppercase mb-1.5 block">Discount</label>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {['none', 'percent', 'flat'].map((type) => (
+                                                    <button
+                                                        key={type}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setDiscountType(type);
+                                                            if (type === 'none') setDiscountValue('');
+                                                        }}
+                                                        className={`py-2 rounded-xl text-xs font-bold capitalize transition-all border ${discountType === type ? 'bg-primary/20 text-primary border-primary' : 'bg-bg border-border text-text-muted hover:border-text-muted'}`}
+                                                    >
+                                                        {type === 'none' ? 'None' : type === 'percent' ? '% Off' : 'Flat LKR'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            {discountType !== 'none' && (
+                                                <div className="mt-2 animate-in slide-in-from-top-2 duration-200">
+                                                    <input
+                                                        type="number"
+                                                        placeholder={discountType === 'percent' ? 'Percentage (e.g. 10)' : 'LKR Amount (e.g. 250)'}
+                                                        value={discountValue}
+                                                        onChange={(e) => setDiscountValue(e.target.value)}
+                                                        className="w-full bg-bg border border-border rounded-xl px-3 py-2.5 text-text focus:outline-none focus:border-primary transition-colors text-sm"
+                                                        min="0"
+                                                        max={discountType === 'percent' ? "100" : undefined}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </div>
 
                         <div className="p-6 border-t border-border bg-surface/80 backdrop-blur-md">
-                            <div className="flex justify-between items-center mb-6">
-                                <span className="text-text-muted font-medium">Total Amount</span>
-                                <span className="text-3xl font-bold text-primary">LKR {cart.reduce((sum, i) => sum + (i.price * i.quantity), 0).toLocaleString()}</span>
+                            <div className="space-y-1.5 mb-6 border-b border-border/50 pb-4">
+                                {discountLkr > 0 && (
+                                    <>
+                                        <div className="flex justify-between items-center text-sm text-text-muted font-medium">
+                                            <span>Subtotal</span>
+                                            <span>LKR {subtotal.toLocaleString()}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm text-primary font-bold">
+                                            <span>Discount</span>
+                                            <span>- LKR {discountLkr.toLocaleString()}</span>
+                                        </div>
+                                    </>
+                                )}
+                                <div className="flex justify-between items-center pt-1.5">
+                                    <span className="text-text-muted font-medium">Total Amount</span>
+                                    <span className="text-3xl font-bold text-primary">LKR {totalAmount.toLocaleString()}</span>
+                                </div>
                             </div>
 
                             <div className="flex gap-4 mb-6">

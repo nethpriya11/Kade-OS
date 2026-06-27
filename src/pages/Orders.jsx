@@ -39,6 +39,17 @@ const Orders = () => {
         // Optimistic update
         setOrders(orders.map(o => o.id === id ? { ...o, status: newStatus } : o));
 
+        // Free table if completed or cancelled
+        if (newStatus === 'completed' || newStatus === 'cancelled') {
+            const order = orders.find(o => o.id === id);
+            if (order && order.table_number) {
+                await supabase
+                    .from('restaurant_tables')
+                    .update({ status: 'free', current_order_id: null, updated_at: new Date().toISOString() })
+                    .eq('table_number', order.table_number);
+            }
+        }
+
         // Deduct Inventory if Completed
         if (newStatus === 'completed') {
             const order = orders.find(o => o.id === id);
@@ -102,7 +113,15 @@ const Orders = () => {
                             <div className="flex justify-between items-start mb-4 relative z-10">
                                 <div>
                                     <h3 className="text-2xl font-bold text-text">#{order.id.slice(0, 4)}</h3>
-                                    <p className="text-text-muted text-sm">Guest</p>
+                                    <p className="text-text-muted text-sm font-medium">
+                                        {order.customer_name || 'Guest'}
+                                        {order.table_number ? ` · Table ${order.table_number}` : ''}
+                                    </p>
+                                    {order.discount_amount > 0 && (
+                                        <span className="text-xs text-primary font-bold bg-primary/10 px-2 py-0.5 rounded-md mt-1 inline-block">
+                                            Discount: {order.discount_type === 'percent' ? `${order.discount_amount}%` : `LKR ${order.discount_amount}`}
+                                        </span>
+                                    )}
                                 </div>
                                 <div className="flex flex-col items-end">
                                     <span className="bg-bg px-2 py-1 rounded-lg text-xs font-bold text-text-muted mb-1 flex items-center gap-1">

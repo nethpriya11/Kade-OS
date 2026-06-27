@@ -23,9 +23,8 @@ const Calculator = () => {
 
     const handleEqual = () => {
         try {
-            // Note: Using eval is generally unsafe, but for a simple local calculator with controlled input, it's acceptable.
-            // Alternatively, we could write a simple parser.
-            const result = eval((equation + display).replace('x', '*'));
+            const expr = (equation + display).replace(/x/g, '*');
+            const result = new Function(`"use strict"; return (${expr})`)();
             setDisplay(String(Number(result.toFixed(4)))); // Limit decimals
             setEquation('');
             setIsNewNumber(true);

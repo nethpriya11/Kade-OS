@@ -51,20 +51,38 @@ const SyncManager = () => {
                     .from('orders')
                     .insert([{
                         total_amount: orderData.total_amount,
+                        payment_method: orderData.payment_method || 'cash',
                         status: 'pending', // Always pending when first synced
-                        created_at: orderData.created_at // Preserve original timestamp
+                        created_at: orderData.created_at, // Preserve original timestamp
+                        discount_amount: orderData.discount_amount,
+                        discount_type: orderData.discount_type,
+                        table_number: orderData.table_number,
+                        customer_name: orderData.customer_name
                     }])
                     .select()
                     .single();
 
                 if (orderError) throw orderError;
 
+                // Update restaurant table status to occupied and link to order ID if table selected
+                if (orderData.table_number) {
+                    await supabase
+                        .from('restaurant_tables')
+                        .update({
+                            status: 'occupied',
+                            current_order_id: order.id,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('table_number', orderData.table_number);
+                }
+
                 // 2. Create Order Items
                 const orderItems = orderData.items.map(item => ({
                     order_id: order.id,
-                    menu_item_id: item.id,
+                    menu_item_id: item.original_id || item.id,
                     quantity: item.quantity,
-                    price_at_time: item.price
+                    price_at_time: item.price,
+                    portion: item.portion || 'normal'
                 }));
 
                 const { error: itemsError } = await supabase

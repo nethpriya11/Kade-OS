@@ -10,7 +10,7 @@ const Menu = () => {
     const [recipe, setRecipe] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
-    const [newItem, setNewItem] = useState({ name: '', category: 'Base', price: '', has_portions: false, large_price: '' });
+    const [newItem, setNewItem] = useState({ name: '', category: 'Base', price: '', has_portions: false, large_price: '', image_url: '' });
     const [editingPrice, setEditingPrice] = useState(false);
     const [editPrice, setEditPrice] = useState('');
     const [editingCategory, setEditingCategory] = useState(false);
@@ -19,6 +19,9 @@ const Menu = () => {
     const [editCost, setEditCost] = useState('');
     const [editingLargePrice, setEditingLargePrice] = useState(false);
     const [editLargePrice, setEditLargePrice] = useState('');
+    const [editingImageUrl, setEditingImageUrl] = useState(false);
+    const [editImageUrl, setEditImageUrl] = useState('');
+    const [uploading, setUploading] = useState(false);
     const [hasPortions, setHasPortions] = useState(false);
     const [isAvailable, setIsAvailable] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -312,18 +315,33 @@ const Menu = () => {
                     <div
                         key={item.id}
                         onClick={() => setSelectedItem(item)}
-                        className="bg-surface border border-border rounded-3xl p-5 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 transition-all cursor-pointer group"
+                        className="bg-surface border border-border rounded-3xl overflow-hidden hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 transition-all cursor-pointer group flex flex-col"
                     >
-                        <div className="flex justify-between items-start mb-4">
-                            <span className="px-3 py-1 bg-bg rounded-full text-xs font-bold text-text-muted border border-border">
-                                {item.category}
-                            </span>
-                            <div className="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center text-text-muted group-hover:bg-primary group-hover:text-bg transition-colors">
-                                <Edit2 size={14} />
+                        {item.image_url ? (
+                            <div className="h-32 w-full overflow-hidden relative">
+                                <img src={item.image_url} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                <span className="absolute top-3 left-3 px-3 py-1 bg-bg/85 backdrop-blur-sm rounded-full text-xs font-bold text-text-muted border border-border/50">
+                                    {item.category}
+                                </span>
+                            </div>
+                        ) : (
+                            <div className="p-5 pb-0 flex justify-between items-start">
+                                <span className="px-3 py-1 bg-bg rounded-full text-xs font-bold text-text-muted border border-border">
+                                    {item.category}
+                                </span>
+                            </div>
+                        )}
+                        <div className="p-5 flex-1 flex flex-col justify-between">
+                            <div>
+                                <h3 className="text-xl font-bold text-text mb-1 truncate">{item.name}</h3>
+                                <p className="text-primary font-bold">LKR {item.price}</p>
+                            </div>
+                            <div className="flex justify-end mt-4">
+                                <div className="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center text-text-muted group-hover:bg-primary group-hover:text-bg transition-colors">
+                                    <Edit2 size={14} />
+                                </div>
                             </div>
                         </div>
-                        <h3 className="text-xl font-bold text-text mb-1">{item.name}</h3>
-                        <p className="text-primary font-bold">LKR {item.price}</p>
                     </div>
                 ))}
 

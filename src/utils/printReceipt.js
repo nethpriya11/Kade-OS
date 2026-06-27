@@ -35,6 +35,16 @@ export const printReceipt = (order) => {
         </div>
     `}).join('');
 
+    const subtotal = items.reduce((sum, item) => sum + (item.price_at_time || item.price || 0) * item.quantity, 0);
+    let discountLkr = 0;
+    if (order.discount_amount && order.discount_type) {
+        if (order.discount_type === 'percent') {
+            discountLkr = subtotal * (parseFloat(order.discount_amount) / 100);
+        } else if (order.discount_type === 'flat') {
+            discountLkr = parseFloat(order.discount_amount);
+        }
+    }
+
     const html = `
         <!DOCTYPE html>
         <html>
@@ -155,18 +165,40 @@ export const printReceipt = (order) => {
                 <span class="left">Date: ${dateStr}</span>
                 <span class="right">Time: ${timeStr}</span>
             </div>
-            <div className="meta-line">
-                <span className="left">Order: #${order.id ? order.id.slice(0, 4) : 'OFF'}</span>
-                <span className="right">Payment: ${(order.payment_method || 'CASH').toUpperCase()}</span>
+            <div class="meta-line">
+                <span class="left">Order: #${order.id ? order.id.slice(0, 4) : 'OFF'}</span>
+                <span class="right">Payment: ${(order.payment_method || 'CASH').toUpperCase()}</span>
             </div>
+            ${order.customer_name ? `
+            <div class="meta-line">
+                <span class="left">Customer: ${order.customer_name}</span>
+            </div>
+            ` : ''}
+            ${order.table_number ? `
+            <div class="meta-line">
+                <span class="left">Table: ${order.table_number}</span>
+            </div>
+            ` : ''}
 
-            <div className="divider"></div>
+            <div class="divider"></div>
 
             <div class="items">
                 ${itemsHtml}
             </div>
 
             <div class="divider"></div>
+
+            ${discountLkr > 0 ? `
+            <div class="meta-line">
+                <span class="left">Subtotal</span>
+                <span class="right">LKR ${subtotal.toLocaleString()}</span>
+            </div>
+            <div class="meta-line">
+                <span class="left">Discount ${order.discount_type === 'percent' ? `(${order.discount_amount}%)` : ''}</span>
+                <span class="right">- LKR ${discountLkr.toLocaleString()}</span>
+            </div>
+            <div class="divider"></div>
+            ` : ''}
 
             <div class="total-section">
                 <span class="left">TOTAL</span>

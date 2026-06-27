@@ -1,24 +1,29 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Package, ShoppingBag, Settings as SettingsIcon, Utensils, FileText, TrendingUp, LogOut, Menu } from 'lucide-react';
+import {
+    LayoutDashboard, ShoppingCart, Package, ShoppingBag, Settings as SettingsIcon,
+    Utensils, FileText, TrendingUp, LogOut, Menu, Clock, Receipt, LayoutGrid
+} from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import NotificationsPanel from './NotificationsPanel';
 
 const Layout = () => {
     const { profile, signOut } = useAuthStore();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
-    // Define all items with their required roles
     const allNavItems = [
         { to: '/', icon: LayoutDashboard, label: 'Dashboard', roles: ['admin'] },
         { to: '/pos', icon: ShoppingCart, label: 'POS', roles: ['admin', 'staff'] },
         { to: '/orders', icon: FileText, label: 'Orders', roles: ['admin', 'staff'] },
+        { to: '/tables', icon: LayoutGrid, label: 'Floor Plan', roles: ['admin', 'staff'] },
         { to: '/analytics', icon: TrendingUp, label: 'Analytics', roles: ['admin'] },
         { to: '/menu', icon: Utensils, label: 'Menu & Recipes', roles: ['admin'] },
         { to: '/inventory', icon: Package, label: 'Inventory', roles: ['admin'] },
         { to: '/procurement', icon: ShoppingBag, label: 'Procurement', roles: ['admin'] },
+        { to: '/expenses', icon: Receipt, label: 'Expenses', roles: ['admin'] },
+        { to: '/shifts', icon: Clock, label: 'Shifts', roles: ['admin', 'staff'] },
     ];
 
-    // Filter items based on current user role
     const navItems = allNavItems.filter(item =>
         profile?.role && item.roles.includes(profile.role)
     );
@@ -36,6 +41,7 @@ const Layout = () => {
                         <span className="font-bold text-lg">Kadé</span>
                     </div>
                 </div>
+                <NotificationsPanel />
             </div>
 
             {/* Sidebar */}
@@ -43,68 +49,72 @@ const Layout = () => {
                 fixed inset-y-0 left-0 z-40 w-64 bg-surface border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0
                 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
             `}>
-                <div className="flex flex-col h-full p-6">
+                <div className="flex flex-col h-full p-5">
                     {/* Logo (Desktop) */}
-                    <div className="hidden md:flex flex-col items-center mb-10">
-                        <div className="flex items-center gap-3 w-full mb-2">
-                            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">K</div>
-                            <div>
-                                <h1 className="font-bold text-lg leading-none">Kadé</h1>
-                                <span className="text-xs text-text-muted">Fast-Casual</span>
+                    <div className="hidden md:flex flex-col items-center mb-8">
+                        <div className="flex items-center justify-between w-full mb-2">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">K</div>
+                                <div>
+                                    <h1 className="font-bold text-lg leading-none">Kadé</h1>
+                                    <span className="text-xs text-text-muted">Fast-Casual</span>
+                                </div>
                             </div>
+                            <NotificationsPanel />
                         </div>
                         {profile && (
-                            <div className="mt-4 px-3 py-1 bg-surface-hover rounded-full text-xs font-bold text-primary border border-primary/20 uppercase tracking-wider w-full text-center">
+                            <div className="mt-3 px-3 py-1 bg-surface-hover rounded-full text-xs font-bold text-primary border border-primary/20 uppercase tracking-wider w-full text-center">
                                 {profile.role}
                             </div>
                         )}
                     </div>
 
                     {/* Nav Items */}
-                    <nav className="flex-1 space-y-2 overflow-y-auto">
+                    <nav className="flex-1 space-y-1 overflow-y-auto">
                         {navItems.map((item) => (
                             <NavLink
                                 key={item.to}
                                 to={item.to}
+                                end={item.to === '/'}
                                 onClick={() => setIsMobileMenuOpen(false)}
                                 className={({ isActive }) => `
-                                    flex items-center gap-4 w-full px-4 py-3 rounded-xl transition-all duration-300
+                                    flex items-center gap-3 w-full px-4 py-2.5 rounded-xl transition-all duration-200 text-sm
                                     ${isActive
                                         ? 'bg-primary text-bg font-bold shadow-lg shadow-primary/20'
                                         : 'text-text-muted hover:bg-surface-hover hover:text-text'}
                                 `}
                             >
-                                <item.icon size={20} strokeWidth={2} />
+                                <item.icon size={18} strokeWidth={2} />
                                 <span>{item.label}</span>
                             </NavLink>
                         ))}
                     </nav>
 
                     {/* Bottom Actions */}
-                    <div className="mt-auto pt-6 border-t border-border space-y-2">
+                    <div className="mt-auto pt-4 border-t border-border space-y-1">
                         <NavLink
                             to="/settings"
                             onClick={() => setIsMobileMenuOpen(false)}
                             className={({ isActive }) => `
-                                flex items-center gap-4 w-full px-4 py-3 rounded-xl transition-colors
+                                flex items-center gap-3 w-full px-4 py-2.5 rounded-xl transition-colors text-sm
                                 ${isActive ? 'bg-surface-hover text-text' : 'text-text-muted hover:text-text hover:bg-surface-hover'}
                             `}
                         >
-                            <SettingsIcon size={20} />
+                            <SettingsIcon size={18} />
                             <span className="font-medium">Settings</span>
                         </NavLink>
                         <button
                             onClick={signOut}
-                            className="flex items-center gap-4 w-full px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors"
+                            className="flex items-center gap-3 w-full px-4 py-2.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors text-sm"
                         >
-                            <LogOut size={20} />
+                            <LogOut size={18} />
                             <span className="font-medium">Logout</span>
                         </button>
                     </div>
                 </div>
             </aside>
 
-            {/* Overlay for mobile */}
+            {/* Mobile overlay */}
             {isMobileMenuOpen && (
                 <div
                     className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm"
@@ -114,10 +124,8 @@ const Layout = () => {
 
             {/* Main Content */}
             <main className="flex-1 overflow-y-auto p-4 md:p-6 relative w-full">
-                {/* Background Gradient Blob */}
                 <div className="fixed top-0 right-0 w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-primary opacity-5 rounded-full blur-[80px] md:blur-[120px] pointer-events-none" />
                 <div className="fixed bottom-0 left-0 w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-secondary opacity-5 rounded-full blur-[80px] md:blur-[120px] pointer-events-none" />
-
                 <div className="relative z-10 max-w-7xl mx-auto pb-20 md:pb-0">
                     <Outlet />
                 </div>

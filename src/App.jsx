@@ -7,16 +7,16 @@ import POS from './pages/POS';
 import Inventory from './pages/Inventory';
 import Menu from './pages/Menu';
 import Orders from './pages/Orders';
-
 import Procurement from './pages/Procurement';
-
 import Analytics from './pages/Analytics';
 import Login from './pages/Login';
 import Settings from './pages/Settings';
+import Shifts from './pages/Shifts';
+import Expenses from './pages/Expenses';
+import Tables from './pages/Tables';
+
 import ProtectedRoute from './components/ProtectedRoute';
-
 import { Toaster } from 'sonner';
-
 import SyncManager from './components/SyncManager';
 import Calculator from './components/Calculator';
 import RealtimeManager from './components/RealtimeManager';
@@ -44,6 +44,9 @@ function App() {
           <Route path="analytics" element={<Analytics />} />
           <Route path="procurement" element={<Procurement />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="shifts" element={<Shifts />} />
+          <Route path="expenses" element={<Expenses />} />
+          <Route path="tables" element={<Tables />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
