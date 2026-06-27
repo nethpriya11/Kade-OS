@@ -27,14 +27,24 @@ const DailyReport = ({ onClose }) => {
         const wastage = wastageRes.data || [];
         const expenses = expensesRes.data || [];
 
-        const revenue = orders.filter(o => o.status === 'completed').reduce((s, o) => s + Number(o.total_amount || 0), 0);
-        const totalOrders = orders.filter(o => o.status === 'completed').length;
+        const completedOrders = orders.filter(o => o.status === 'completed');
+        const revenue = completedOrders.reduce((s, o) => s + Number(o.total_amount || 0), 0);
+        const totalOrders = completedOrders.length;
         const cancelledOrders = orders.filter(o => o.status === 'cancelled').length;
         const avgOrderValue = totalOrders > 0 ? revenue / totalOrders : 0;
         const wastageCost = wastage.reduce((s, w) => s + Number(w.cost_at_time || 0), 0);
         const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
-        const taxCollected = orders.filter(o => o.status === 'completed').reduce((s, o) => s + Number(o.tax_amount || 0), 0);
-        const netProfit = revenue - wastageCost - totalExpenses - taxCollected;
+        const taxCollected = completedOrders.reduce((s, o) => s + Number(o.tax_amount || 0), 0);
+
+        let totalCOGS = 0;
+        completedOrders.forEach(order => {
+            order.order_items?.forEach(item => {
+                const itemCost = item.menu_items?.cost || (item.price_at_time * 0.3);
+                totalCOGS += itemCost * item.quantity;
+            });
+        });
+
+        const netProfit = revenue - totalCOGS - wastageCost - totalExpenses - taxCollected;
 
         const profitMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
 
@@ -61,7 +71,7 @@ const DailyReport = ({ onClose }) => {
         });
         const busiestHour = Object.entries(hourMap).sort(([, a], [, b]) => b - a)[0];
 
-        setData({ revenue, totalOrders, cancelledOrders, avgOrderValue, wastageCost, totalExpenses, taxCollected, netProfit, profitMargin, topItem, payMap, busiestHour, startTime: start });
+        setData({ revenue, totalCOGS, totalOrders, cancelledOrders, avgOrderValue, wastageCost, totalExpenses, taxCollected, netProfit, profitMargin, topItem, payMap, busiestHour, startTime: start });
         setLoading(false);
     };
 
@@ -134,6 +144,10 @@ const DailyReport = ({ onClose }) => {
                                 <p className="text-xl font-bold text-text">LKR {data.avgOrderValue.toFixed(0)}</p>
                             </div>
                             <div className="bg-bg rounded-2xl p-4 border border-border">
+                                <p className="text-text-muted text-xs font-bold uppercase tracking-wider mb-2">COGS</p>
+                                <p className="text-xl font-bold text-red-400">LKR {data.totalCOGS.toLocaleString()}</p>
+                            </div>
+                            <div className="bg-bg rounded-2xl p-4 border border-border">
                                 <p className="text-text-muted text-xs font-bold uppercase tracking-wider mb-2">Cancelled Orders</p>
                                 <p className="text-xl font-bold text-red-400">{data.cancelledOrders}</p>
                             </div>
@@ -144,6 +158,10 @@ const DailyReport = ({ onClose }) => {
                             <div className="bg-bg rounded-2xl p-4 border border-border">
                                 <p className="text-text-muted text-xs font-bold uppercase tracking-wider mb-2">Expenses Today</p>
                                 <p className="text-xl font-bold text-text">LKR {data.totalExpenses.toLocaleString()}</p>
+                            </div>
+                            <div className="bg-bg rounded-2xl p-4 border border-border">
+                                <p className="text-text-muted text-xs font-bold uppercase tracking-wider mb-2">Wastage</p>
+                                <p className="text-xl font-bold text-red-400">LKR {data.wastageCost.toLocaleString()}</p>
                             </div>
                         </div>
 
@@ -210,7 +228,7 @@ const DailyReport = ({ onClose }) => {
                             </div>
                             <div className="flex justify-between text-xs text-text-muted mt-2">
                                 <span>Revenue: LKR {data.revenue.toLocaleString()}</span>
-                                <span>Costs: LKR {(data.wastageCost + data.totalExpenses).toLocaleString()}</span>
+                                <span>Costs: LKR {(data.totalCOGS + data.wastageCost + data.totalExpenses).toLocaleString()}</span>
                             </div>
                         </div>
                     </div>

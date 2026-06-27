@@ -2,10 +2,11 @@ import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import {
     LayoutDashboard, ShoppingCart, Package, ShoppingBag, Settings as SettingsIcon,
-    Utensils, FileText, TrendingUp, LogOut, Menu,     Clock, Receipt, LayoutGrid, Building2
+    Utensils, FileText, TrendingUp, LogOut, Menu, Clock, Receipt, LayoutGrid, Building2, BarChart3, Users
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import NotificationsPanel from './NotificationsPanel';
+import KitchenAssistant from './KitchenAssistant';
 
 const Layout = () => {
     const { profile, signOut } = useAuthStore();
@@ -17,11 +18,13 @@ const Layout = () => {
         { to: '/orders', icon: FileText, label: 'Orders', roles: ['admin', 'staff'] },
         { to: '/tables', icon: LayoutGrid, label: 'Floor Plan', roles: ['admin', 'staff'] },
         { to: '/analytics', icon: TrendingUp, label: 'Analytics', roles: ['admin'] },
+        { to: '/pnl', icon: BarChart3, label: 'P&L', roles: ['admin'] },
         { to: '/menu', icon: Utensils, label: 'Menu & Recipes', roles: ['admin'] },
         { to: '/inventory', icon: Package, label: 'Inventory', roles: ['admin'] },
         { to: '/procurement', icon: ShoppingBag, label: 'Procurement', roles: ['admin'] },
         { to: '/expenses', icon: Receipt, label: 'Expenses', roles: ['admin'] },
         { to: '/suppliers', icon: Building2, label: 'Suppliers', roles: ['admin'] },
+        { to: '/staff', icon: Users, label: 'Staff', roles: ['admin'] },
         { to: '/shifts', icon: Clock, label: 'Shifts', roles: ['admin', 'staff'] },
     ];
 
@@ -124,6 +127,7 @@ const Layout = () => {
             )}
 
             {/* Main Content */}
+            <KitchenAssistant />
             <main className="flex-1 overflow-y-auto p-4 md:p-6 relative w-full">
                 <div className="fixed top-0 right-0 w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-primary opacity-5 rounded-full blur-[80px] md:blur-[120px] pointer-events-none" />
                 <div className="fixed bottom-0 left-0 w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-secondary opacity-5 rounded-full blur-[80px] md:blur-[120px] pointer-events-none" />
