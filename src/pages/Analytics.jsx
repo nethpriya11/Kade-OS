@@ -12,7 +12,7 @@ const PAYMENT_COLORS = { CASH: '#FFD700', CARD: '#4ECDC4', ONLINE: '#A78BFA' };
 const Analytics = () => {
     const [timeRange, setTimeRange] = useState('today');
     const [compareMode, setCompareMode] = useState(false);
-    const [metrics, setMetrics] = useState({ revenue: 0, orders: 0, avgOrderValue: 0, wastageCost: 0, netProfit: 0, totalExpenses: 0 });
+    const [metrics, setMetrics] = useState({ revenue: 0, orders: 0, avgOrderValue: 0, wastageCost: 0, netProfit: 0, totalExpenses: 0, taxCollected: 0 });
     const [prevMetrics, setPrevMetrics] = useState({ revenue: 0, orders: 0 });
     const [revenueData, setRevenueData] = useState([]);
     const [categoryData, setCategoryData] = useState([]);
@@ -80,6 +80,7 @@ const Analytics = () => {
         const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
         const totalWastage = wastage.reduce((s, w) => s + Number(w.cost_at_time || 0), 0);
         const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+        const taxCollected = completedOrders.reduce((s, o) => s + Number(o.tax_amount || 0), 0);
 
         let totalCostOfGoods = 0;
         completedOrders.forEach(order => {
@@ -89,9 +90,9 @@ const Analytics = () => {
             });
         });
 
-        const netProfit = totalRevenue - totalCostOfGoods - totalWastage - totalExpenses;
+        const netProfit = totalRevenue - totalCostOfGoods - totalWastage - totalExpenses - taxCollected;
 
-        setMetrics({ revenue: totalRevenue, orders: totalOrders, avgOrderValue, wastageCost: totalWastage, netProfit, totalExpenses });
+        setMetrics({ revenue: totalRevenue, orders: totalOrders, avgOrderValue, wastageCost: totalWastage, netProfit, totalExpenses, taxCollected });
 
         // Revenue trend
         const trendMap = {};
@@ -192,13 +193,14 @@ const Analytics = () => {
             </div>
 
             {/* Metrics Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 {[
                     { title: 'Total Revenue', value: `LKR ${metrics.revenue.toLocaleString()}`, icon: DollarSign, color: 'text-primary', bg: 'bg-primary/10', compareVal: prevMetrics.revenue },
                     { title: 'Net Profit', value: `LKR ${metrics.netProfit.toLocaleString()}`, sub: `Margin: ${metrics.revenue > 0 ? ((metrics.netProfit / metrics.revenue) * 100).toFixed(1) : 0}%`, icon: TrendingUp, color: metrics.netProfit >= 0 ? 'text-green-400' : 'text-red-400', bg: metrics.netProfit >= 0 ? 'bg-green-400/10' : 'bg-red-400/10' },
                     { title: 'Total Orders', value: metrics.orders, sub: `Avg: LKR ${metrics.avgOrderValue.toFixed(0)}`, icon: ShoppingBag, color: 'text-blue-400', bg: 'bg-blue-400/10' },
                     { title: 'Wastage Cost', value: `LKR ${metrics.wastageCost.toLocaleString()}`, icon: AlertTriangle, color: 'text-red-400', bg: 'bg-red-400/10' },
                     { title: 'Total Expenses', value: `LKR ${metrics.totalExpenses.toLocaleString()}`, icon: AlertTriangle, color: 'text-orange-400', bg: 'bg-orange-400/10' },
+                    { title: 'Tax Collected', value: `LKR ${metrics.taxCollected.toLocaleString()}`, icon: TrendingUp, color: 'text-primary', bg: 'bg-primary/10' },
                 ].map((m, i) => (
                     <div key={i} className="bg-surface p-5 rounded-3xl border border-border shadow-sm hover:border-primary/30 transition-colors">
                         <div className="flex justify-between items-start mb-4">

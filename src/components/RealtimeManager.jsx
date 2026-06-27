@@ -32,7 +32,7 @@ const RealtimeManager = () => {
                 // Since payload.new only has the raw data
                 const { data, error } = await supabase
                     .from('restock_logs')
-                    .select('*, ingredients(name, unit)')
+                    .select('*, ingredients(name, unit), suppliers(name)')
                     .eq('id', payload.new.id)
                     .single();
 
@@ -61,7 +61,7 @@ const RealtimeManager = () => {
         // Fetch Logs (Last 50)
         const { data: logs } = await supabase
             .from('restock_logs')
-            .select('*, ingredients(name, unit)')
+            .select('*, ingredients(name, unit), suppliers(name)')
             .order('created_at', { ascending: false })
             .limit(50);
 

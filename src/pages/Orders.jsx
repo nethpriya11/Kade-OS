@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const Orders = () => {
     const [orders, setOrders] = useState([]);
+    const deductedOrders = React.useRef(new Set());
 
     useEffect(() => {
         fetchOrders();
@@ -50,8 +51,9 @@ const Orders = () => {
             }
         }
 
-        // Deduct Inventory if Completed
-        if (newStatus === 'completed') {
+        // Deduct Inventory if Completed (idempotent — only once per order)
+        if (newStatus === 'completed' && !deductedOrders.current.has(id)) {
+            deductedOrders.current.add(id);
             const order = orders.find(o => o.id === id);
             if (order && order.order_items) {
                 const deductionPromises = [];

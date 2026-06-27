@@ -27,8 +27,25 @@ const POS = () => {
     const [customerName, setCustomerName] = useState('');
     const [discountType, setDiscountType] = useState('none'); // 'none', 'percent', 'flat'
     const [discountValue, setDiscountValue] = useState('');
+    const [taxRate, setTaxRate] = useState(0);
+    const [businessInfo, setBusinessInfo] = useState({ business_name: 'Kadé', business_address: '', business_phone: '' });
 
     const categories = ['All', 'Base', 'Protein', 'Drink', 'Extra'];
+
+    useEffect(() => {
+        supabase.from('settings').select('*').then(({ data }) => {
+            if (data) {
+                const map = {};
+                data.forEach(s => { map[s.key] = s.value; });
+                setTaxRate(parseFloat(map.tax_rate) || 0);
+                setBusinessInfo({
+                    business_name: map.business_name || 'Kadé',
+                    business_address: map.business_address || '',
+                    business_phone: map.business_phone || '',
+                });
+            }
+        }).catch(() => {});
+    }, []);
 
     const handleAddPortionItem = (item, portionType) => {
         const price = portionType === 'large' ? item.large_price : item.price;
@@ -92,6 +109,18 @@ const POS = () => {
             return;
         }
 
+        if (discountType !== 'none') {
+            const val = parseFloat(discountValue);
+            if (isNaN(val) || val < 0) {
+                toast.error('Please enter a valid discount value');
+                return;
+            }
+            if (discountType === 'percent' && (val > 100)) {
+                toast.error('Percentage discount cannot exceed 100%');
+                return;
+            }
+        }
+
         setProcessing(true);
 
         try {
@@ -110,7 +139,8 @@ const POS = () => {
                 discountLkr = discountAmount;
             }
 
-            const totalAmount = Math.max(0, subtotal - discountLkr);
+            const taxAmount = subtotal * (taxRate / 100);
+            const totalAmount = Math.max(0, subtotal - discountLkr + taxAmount);
 
             if (!isOnline) {
                 // OFFLINE FLOW
@@ -122,7 +152,9 @@ const POS = () => {
                     discount_amount: discountAmount > 0 ? discountAmount : null,
                     discount_type: discountType !== 'none' ? discountType : null,
                     table_number: selectedTableNumber ? parseInt(selectedTableNumber) : null,
-                    customer_name: customerName || null
+                    customer_name: customerName || null,
+                    tax_rate: taxRate,
+                    tax_amount: taxAmount
                 });
 
                 toast.success('Order saved offline! Will sync when online.');
@@ -135,6 +167,11 @@ const POS = () => {
                     discount_type: discountType !== 'none' ? discountType : null,
                     table_number: selectedTableNumber ? parseInt(selectedTableNumber) : null,
                     customer_name: customerName || null,
+                    tax_rate: taxRate,
+                    tax_amount: taxAmount,
+                    business_name: businessInfo.business_name,
+                    business_address: businessInfo.business_address,
+                    business_phone: businessInfo.business_phone,
                     order_items: cart.map(item => ({
                         quantity: item.quantity,
                         price_at_time: item.price,
@@ -163,7 +200,9 @@ const POS = () => {
                     discount_amount: discountAmount > 0 ? discountAmount : null,
                     discount_type: discountType !== 'none' ? discountType : null,
                     table_number: selectedTableNumber ? parseInt(selectedTableNumber) : null,
-                    customer_name: customerName || null
+                    customer_name: customerName || null,
+                    tax_rate: taxRate,
+                    tax_amount: taxAmount
                 }])
                 .select()
                 .single();
@@ -203,6 +242,11 @@ const POS = () => {
             // Print Receipt
             printReceipt({
                 ...order,
+                tax_rate: taxRate,
+                tax_amount: taxAmount,
+                business_name: businessInfo.business_name,
+                business_address: businessInfo.business_address,
+                business_phone: businessInfo.business_phone,
                 order_items: cart.map(item => ({
                     quantity: item.quantity,
                     price_at_time: item.price,
@@ -237,7 +281,8 @@ const POS = () => {
             discountLkr = discountValNum;
         }
     }
-    const totalAmount = Math.max(0, subtotal - discountLkr);
+    const taxAmount = subtotal * (taxRate / 100);
+    const totalAmount = Math.max(0, subtotal - discountLkr + taxAmount);
 
     const container = {
         hidden: { opacity: 0 },
@@ -594,17 +639,21 @@ const POS = () => {
 
                         <div className="p-6 border-t border-border bg-surface/80 backdrop-blur-md">
                             <div className="space-y-1.5 mb-6 border-b border-border/50 pb-4">
+                                <div className="flex justify-between items-center text-sm text-text-muted font-medium">
+                                    <span>Subtotal</span>
+                                    <span>LKR {subtotal.toLocaleString()}</span>
+                                </div>
                                 {discountLkr > 0 && (
-                                    <>
-                                        <div className="flex justify-between items-center text-sm text-text-muted font-medium">
-                                            <span>Subtotal</span>
-                                            <span>LKR {subtotal.toLocaleString()}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-sm text-primary font-bold">
-                                            <span>Discount</span>
-                                            <span>- LKR {discountLkr.toLocaleString()}</span>
-                                        </div>
-                                    </>
+                                    <div className="flex justify-between items-center text-sm text-primary font-bold">
+                                        <span>Discount</span>
+                                        <span>- LKR {discountLkr.toLocaleString()}</span>
+                                    </div>
+                                )}
+                                {taxRate > 0 && (
+                                    <div className="flex justify-between items-center text-sm text-text-muted">
+                                        <span>Tax ({taxRate}%)</span>
+                                        <span>LKR {taxAmount.toLocaleString()}</span>
+                                    </div>
                                 )}
                                 <div className="flex justify-between items-center pt-1.5">
                                     <span className="text-text-muted font-medium">Total Amount</span>

@@ -20,6 +20,7 @@ const Procurement = () => {
     const [tempNote, setTempNote] = useState('');
     const [showHistory, setShowHistory] = useState(false);
     const [restockLogs, setRestockLogs] = useState([]);
+    const [supplierPrices, setSupplierPrices] = useState({}); // { ingredientId: [{supplier_name, price, min_order_qty}] }
 
     const PROC_KEY = 'kade_procurement_status';
     const NOTES_KEY = 'kade_procurement_notes';
@@ -31,13 +32,27 @@ const Procurement = () => {
         setNotes(savedNotes);
         fetchItems();
         fetchHistory();
+        fetchSupplierPrices();
     }, []);
+
+    const fetchSupplierPrices = async () => {
+        const { data } = await supabase
+            .from('supplier_prices')
+            .select('*, suppliers(name)');
+        if (data) {
+            const map = {};
+            data.forEach(sp => {
+                if (!map[sp.ingredient_id]) map[sp.ingredient_id] = [];
+                map[sp.ingredient_id].push(sp);
+            });
+            setSupplierPrices(map);
+        }
+    };
 
     const fetchItems = async () => {
         const { data } = await supabase
             .from('ingredients')
             .select('*')
-            .lt('current_stock', 20)
             .order('current_stock', { ascending: true });
         if (data) setItems(data);
         setLoading(false);
@@ -69,6 +84,8 @@ const Procurement = () => {
         setEditingNote(null);
     };
 
+    const toBuyAmount = (item) => Math.max(0, (item.low_stock_threshold || 20) - item.current_stock);
+
     const exportList = () => {
         const displayItems = items.filter(item => {
             const status = procurementStatus[item.id] || 'needed';
@@ -76,7 +93,7 @@ const Procurement = () => {
         });
 
         const text = displayItems.map(item => {
-            const toBuy = Math.max(0, 20 - item.current_stock);
+            const toBuy = toBuyAmount(item);
             const status = procurementStatus[item.id] || 'needed';
             const note = notes[item.id] || '';
             return `• ${item.name} — Buy: ${toBuy} ${item.unit} (Stock: ${item.current_stock}) [${status.toUpperCase()}]${note ? ` | Note: ${note}` : ''}`;
@@ -191,7 +208,7 @@ const Procurement = () => {
                         {displayItems.map((item, index) => {
                             const status = getStatus(item.id);
                             const cfg = STATUS_CONFIG[status];
-                            const toBuy = Math.max(0, 20 - item.current_stock);
+                            const toBuy = toBuyAmount(item);
 
                             return (
                                 <motion.div
@@ -213,6 +230,15 @@ const Procurement = () => {
                                                 Stock: <span className="text-red-400 font-bold">{item.current_stock} {item.unit}</span>
                                                 {item.purchase_price > 0 && (
                                                     <span className="ml-3">Est. cost: <span className="text-text font-semibold">LKR {(toBuy * item.purchase_price).toLocaleString()}</span></span>
+                                                )}
+                                                <span className="ml-3 text-xs text-text-muted">Threshold: {item.low_stock_threshold || 20} {item.unit}</span>
+                                                {supplierPrices[item.id] && supplierPrices[item.id].length > 0 && (
+                                                    <div className="mt-1 text-xs text-text-muted">
+                                                        <span className="text-primary font-bold">Best: </span>
+                                                        {supplierPrices[item.id].sort((a, b) => a.price - b.price)[0]?.suppliers?.name}
+                                                        {' @ LKR '}
+                                                        {Math.min(...supplierPrices[item.id].map(p => p.price)).toFixed(2)}
+                                                    </div>
                                                 )}
                                             </p>
                                             {/* Supplier Note */}

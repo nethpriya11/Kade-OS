@@ -154,9 +154,9 @@ export const printReceipt = (order) => {
         <body>
             <div class="header">
                 <img src="/logo.png" class="logo-img" alt="Logo" onerror="this.style.display='none'" />
-                <div class="shop-name">Fast Casual Restaurant</div>
-                <div class="shop-info">96 Leisure, High Level Road, Maharagama</div>
-                <div class="shop-info">Tel: 0777 474 300</div>
+                <div class="shop-name">${order.business_name || 'Fast Casual Restaurant'}</div>
+                ${order.business_address ? `<div class="shop-info">${order.business_address}</div>` : ''}
+                ${order.business_phone ? `<div class="shop-info">Tel: ${order.business_phone}</div>` : ''}
             </div>
 
             <div class="divider"></div>
@@ -188,17 +188,23 @@ export const printReceipt = (order) => {
 
             <div class="divider"></div>
 
-            ${discountLkr > 0 ? `
             <div class="meta-line">
                 <span class="left">Subtotal</span>
                 <span class="right">LKR ${subtotal.toLocaleString()}</span>
             </div>
+            ${discountLkr > 0 ? `
             <div class="meta-line">
                 <span class="left">Discount ${order.discount_type === 'percent' ? `(${order.discount_amount}%)` : ''}</span>
                 <span class="right">- LKR ${discountLkr.toLocaleString()}</span>
             </div>
-            <div class="divider"></div>
             ` : ''}
+            ${order.tax_rate > 0 ? `
+            <div class="meta-line">
+                <span class="left">Tax (${order.tax_rate}%)</span>
+                <span class="right">LKR ${Number(order.tax_amount || 0).toLocaleString()}</span>
+            </div>
+            ` : ''}
+            <div class="divider"></div>
 
             <div class="total-section">
                 <span class="left">TOTAL</span>

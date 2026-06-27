@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { predictCategory } from '../lib/gemini';
 import { useInventoryStore } from '../store/inventoryStore';
 import { Package, AlertTriangle, Save, Plus, Search, X, Check, Edit2, Trash2, MinusCircle, Sparkles, History } from 'lucide-react';
+import { toast } from 'sonner';
 
 const DEFAULT_CATEGORIES = ['Produce', 'Meat', 'Spices', 'Dairy', 'Dry Goods', 'Bakery', 'Other'];
 
@@ -36,13 +37,22 @@ const Inventory = () => {
     const [isRestockModalOpen, setIsRestockModalOpen] = useState(false);
     const [isRestocking, setIsRestocking] = useState(false);
     const [selectedForRestock, setSelectedForRestock] = useState(null);
-    const [restockData, setRestockData] = useState({ quantity: '', price: '', totalCost: '' });
+    const [restockData, setRestockData] = useState({ quantity: '', price: '', totalCost: '', supplier_id: '' });
 
     // AI Prediction State
     const [isPredicting, setIsPredicting] = useState(false);
 
     // History State
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+    // Suppliers
+    const [suppliers, setSuppliers] = useState([]);
+
+    useEffect(() => {
+        supabase.from('suppliers').select('id, name').order('name').then(({ data }) => {
+            if (data) setSuppliers(data);
+        }).catch(() => {});
+    }, []);
 
     // Derived Categories
     const allCategories = Array.from(new Set([...DEFAULT_CATEGORIES, ...ingredients.map(i => i.category || 'Other')]));
@@ -78,6 +88,28 @@ const Inventory = () => {
     };
 
     const handleSave = async (id) => {
+        const stock = parseFloat(editValues.stock);
+        const price = parseFloat(editValues.price);
+        const yieldVal = parseFloat(editValues.yield);
+        const threshold = parseFloat(editValues.threshold);
+
+        if (isNaN(stock) || stock < 0) {
+            toast.error('Stock must be a valid non-negative number');
+            return;
+        }
+        if (isNaN(price) || price < 0) {
+            toast.error('Price must be a valid non-negative number');
+            return;
+        }
+        if (isNaN(yieldVal) || yieldVal <= 0 || yieldVal > 100) {
+            toast.error('Yield must be between 1 and 100');
+            return;
+        }
+        if (isNaN(threshold) || threshold < 0) {
+            toast.error('Low stock threshold must be a valid non-negative number');
+            return;
+        }
+
         setIsSaving(true);
         try {
             // Create a promise that rejects after 10 seconds
@@ -113,14 +145,25 @@ const Inventory = () => {
             setEditingId(null);
         } catch (error) {
             console.error('Error updating ingredient:', error);
-            alert(`Failed to update ingredient: ${error.message}`);
+            toast.error(`Failed to update ingredient: ${error.message}`);
         } finally {
             setIsSaving(false);
         }
     };
 
     const handleCreate = async () => {
-        if (!newIngredient.name) return;
+        if (!newIngredient.name) {
+            toast.error('Ingredient name is required');
+            return;
+        }
+        if (isNaN(newIngredient.purchase_price) || newIngredient.purchase_price < 0) {
+            toast.error('Please enter a valid purchase price');
+            return;
+        }
+        if (isNaN(newIngredient.yield_percent) || newIngredient.yield_percent <= 0 || newIngredient.yield_percent > 100) {
+            toast.error('Yield must be between 1 and 100');
+            return;
+        }
         setIsSubmitting(true);
 
         try {
@@ -156,7 +199,7 @@ const Inventory = () => {
             });
         } catch (error) {
             console.error('Error creating ingredient:', error);
-            alert(`Failed to create ingredient: ${error.message}`);
+            toast.error(`Failed to create ingredient: ${error.message}`);
         } finally {
             setIsSubmitting(false);
         }
@@ -169,10 +212,23 @@ const Inventory = () => {
     };
 
     const handleReportWastage = async () => {
-        if (!selectedForWastage || !wastageData.quantity) return;
+        if (!selectedForWastage || !wastageData.quantity) {
+            toast.error('Please enter a quantity');
+            return;
+        }
         setIsWastageSubmitting(true);
 
         const quantity = parseFloat(wastageData.quantity);
+        if (isNaN(quantity) || quantity <= 0) {
+            toast.error('Quantity must be greater than 0');
+            setIsWastageSubmitting(false);
+            return;
+        }
+        if (quantity > selectedForWastage.current_stock) {
+            toast.error(`Cannot waste more than current stock (${selectedForWastage.current_stock})`);
+            setIsWastageSubmitting(false);
+            return;
+        }
         const costAtTime = (selectedForWastage.purchase_price / (selectedForWastage.yield_percent / 100)) * quantity;
 
         try {
@@ -212,7 +268,7 @@ const Inventory = () => {
             setIsWastageModalOpen(false);
         } catch (error) {
             console.error('Error reporting wastage:', error);
-            alert(`Failed to report wastage: ${error.message}`);
+            toast.error(`Failed to report wastage: ${error.message}`);
         } finally {
             setIsWastageSubmitting(false);
         }
@@ -238,16 +294,17 @@ const Inventory = () => {
 
                 // Optimistic Update
                 useInventoryStore.getState().deleteIngredient(id);
+                toast.success('Ingredient deleted');
             } catch (error) {
                 console.error('Error deleting ingredient:', error);
-                alert(`Failed to delete ingredient: ${error.message}`);
+                toast.error(`Failed to delete ingredient: ${error.message}`);
             }
         }
     };
 
     const openRestockModal = (item) => {
         setSelectedForRestock(item);
-        setRestockData({ quantity: '', price: item.purchase_price || '', totalCost: '' });
+        setRestockData({ quantity: '', price: item.purchase_price || '', totalCost: '', supplier_id: '' });
         setIsRestockModalOpen(true);
     };
 
@@ -283,12 +340,17 @@ const Inventory = () => {
 
     const handleRestock = async () => {
         if (!selectedForRestock || !restockData.quantity) {
-            alert("Please enter a valid quantity.");
+            toast.error('Please enter a valid quantity.');
             return;
         }
         setIsRestocking(true);
 
         const quantity = parseFloat(restockData.quantity);
+        if (isNaN(quantity) || quantity <= 0) {
+            toast.error('Quantity must be greater than 0');
+            setIsRestocking(false);
+            return;
+        }
         const currentStock = parseFloat(selectedForRestock.current_stock || 0);
         const newPrice = restockData.price ? parseFloat(restockData.price) : selectedForRestock.purchase_price;
 
@@ -308,7 +370,8 @@ const Inventory = () => {
                         ingredient_id: selectedForRestock.id,
                         quantity: quantity,
                         cost_per_unit: newPrice,
-                        total_cost: totalCost
+                        total_cost: totalCost,
+                        supplier_id: restockData.supplier_id || null
                     }]),
                 timeoutPromise
             ]);
@@ -335,7 +398,7 @@ const Inventory = () => {
             setIsRestockModalOpen(false);
         } catch (error) {
             console.error('Error restocking:', error);
-            alert(`Failed to restock: ${error.message}`);
+            toast.error(`Failed to restock: ${error.message}`);
         } finally {
             setIsRestocking(false);
         }
@@ -554,6 +617,7 @@ const Inventory = () => {
                                     <label className="block text-text-muted text-sm font-bold mb-1">Current Stock</label>
                                     <input
                                         type="number"
+                                        min="0"
                                         value={editValues.stock}
                                         onChange={e => setEditValues({ ...editValues, stock: e.target.value })}
                                         className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
@@ -566,6 +630,7 @@ const Inventory = () => {
                                     <label className="block text-text-muted text-sm font-bold mb-1">Low Stock Alert</label>
                                     <input
                                         type="number"
+                                        min="0"
                                         value={editValues.threshold}
                                         onChange={e => setEditValues({ ...editValues, threshold: e.target.value })}
                                         className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
@@ -575,6 +640,8 @@ const Inventory = () => {
                                     <label className="block text-text-muted text-sm font-bold mb-1">Yield %</label>
                                     <input
                                         type="number"
+                                        min="1"
+                                        max="100"
                                         value={editValues.yield}
                                         onChange={e => setEditValues({ ...editValues, yield: e.target.value })}
                                         className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
@@ -586,6 +653,7 @@ const Inventory = () => {
                                 <label className="block text-text-muted text-sm font-bold mb-1">Purchase Price</label>
                                 <input
                                     type="number"
+                                    min="0"
                                     value={editValues.price}
                                     onChange={e => setEditValues({ ...editValues, price: e.target.value })}
                                     className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
@@ -837,6 +905,20 @@ const Inventory = () => {
                                 </div>
                             </div>
 
+                            <div>
+                                <label className="block text-text-muted text-sm font-bold mb-1">Supplier</label>
+                                <select
+                                    value={restockData.supplier_id}
+                                    onChange={e => setRestockData({ ...restockData, supplier_id: e.target.value })}
+                                    className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
+                                >
+                                    <option value="">Select supplier...</option>
+                                    {suppliers.map(s => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
                             <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 flex items-start gap-3">
                                 <Plus className="text-green-400 shrink-0" size={20} />
                                 <div>
@@ -886,6 +968,7 @@ const Inventory = () => {
                                         <tr className="text-text-muted text-sm border-b border-border">
                                             <th className="pb-3 pl-2 font-bold">Date</th>
                                             <th className="pb-3 font-bold">Item</th>
+                                            <th className="pb-3 font-bold">Supplier</th>
                                             <th className="pb-3 font-bold">Qty</th>
                                             <th className="pb-3 font-bold text-right pr-2">Total Cost</th>
                                         </tr>
@@ -898,6 +981,9 @@ const Inventory = () => {
                                                 </td>
                                                 <td className="py-3 text-text font-medium">
                                                     {log.ingredients?.name || 'Unknown'}
+                                                </td>
+                                                <td className="py-3 text-text-muted text-sm">
+                                                    {log.suppliers?.name || '—'}
                                                 </td>
                                                 <td className="py-3 text-text">
                                                     +{log.quantity} {log.ingredients?.unit}

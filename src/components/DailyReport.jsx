@@ -33,7 +33,10 @@ const DailyReport = ({ onClose }) => {
         const avgOrderValue = totalOrders > 0 ? revenue / totalOrders : 0;
         const wastageCost = wastage.reduce((s, w) => s + Number(w.cost_at_time || 0), 0);
         const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
-        const netProfit = revenue - wastageCost - totalExpenses;
+        const taxCollected = orders.filter(o => o.status === 'completed').reduce((s, o) => s + Number(o.tax_amount || 0), 0);
+        const netProfit = revenue - wastageCost - totalExpenses - taxCollected;
+
+        const profitMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
 
         // Item sales map
         const itemMap = {};
@@ -58,7 +61,7 @@ const DailyReport = ({ onClose }) => {
         });
         const busiestHour = Object.entries(hourMap).sort(([, a], [, b]) => b - a)[0];
 
-        setData({ revenue, totalOrders, cancelledOrders, avgOrderValue, wastageCost, totalExpenses, netProfit, topItem, payMap, busiestHour, startTime: start });
+        setData({ revenue, totalOrders, cancelledOrders, avgOrderValue, wastageCost, totalExpenses, taxCollected, netProfit, profitMargin, topItem, payMap, busiestHour, startTime: start });
         setLoading(false);
     };
 
@@ -125,18 +128,22 @@ const DailyReport = ({ onClose }) => {
                         </div>
 
                         {/* Secondary Stats */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div className="bg-bg rounded-2xl p-4 border border-border">
                                 <p className="text-text-muted text-xs font-bold uppercase tracking-wider mb-2">Avg Order Value</p>
-                                <p className="text-2xl font-bold text-text">LKR {data.avgOrderValue.toFixed(0)}</p>
+                                <p className="text-xl font-bold text-text">LKR {data.avgOrderValue.toFixed(0)}</p>
                             </div>
                             <div className="bg-bg rounded-2xl p-4 border border-border">
                                 <p className="text-text-muted text-xs font-bold uppercase tracking-wider mb-2">Cancelled Orders</p>
-                                <p className="text-2xl font-bold text-red-400">{data.cancelledOrders}</p>
+                                <p className="text-xl font-bold text-red-400">{data.cancelledOrders}</p>
+                            </div>
+                            <div className="bg-bg rounded-2xl p-4 border border-border">
+                                <p className="text-text-muted text-xs font-bold uppercase tracking-wider mb-2">Tax Collected</p>
+                                <p className="text-xl font-bold text-primary">LKR {data.taxCollected.toLocaleString()}</p>
                             </div>
                             <div className="bg-bg rounded-2xl p-4 border border-border">
                                 <p className="text-text-muted text-xs font-bold uppercase tracking-wider mb-2">Expenses Today</p>
-                                <p className="text-2xl font-bold text-text">LKR {data.totalExpenses.toLocaleString()}</p>
+                                <p className="text-xl font-bold text-text">LKR {data.totalExpenses.toLocaleString()}</p>
                             </div>
                         </div>
 
@@ -191,13 +198,13 @@ const DailyReport = ({ onClose }) => {
                             <div className="flex justify-between items-center mb-3">
                                 <p className="text-text font-bold">Profit Margin</p>
                                 <span className={`text-sm font-bold ${data.netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                    {data.revenue > 0 ? ((data.netProfit / data.revenue) * 100).toFixed(1) : 0}%
+                                    {data.profitMargin.toFixed(1)}%
                                 </span>
                             </div>
                             <div className="h-2 bg-surface rounded-full overflow-hidden">
                                 <motion.div
                                     initial={{ width: 0 }}
-                                    animate={{ width: `${Math.max(0, Math.min(100, data.revenue > 0 ? (data.netProfit / data.revenue) * 100 : 0))}%` }}
+                                    animate={{ width: `${Math.max(0, Math.min(100, data.profitMargin))}%` }}
                                     className={`h-full rounded-full ${data.netProfit >= 0 ? 'bg-green-400' : 'bg-red-400'}`}
                                 />
                             </div>

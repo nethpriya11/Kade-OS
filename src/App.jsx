@@ -14,6 +14,7 @@ import Settings from './pages/Settings';
 import Shifts from './pages/Shifts';
 import Expenses from './pages/Expenses';
 import Tables from './pages/Tables';
+import Suppliers from './pages/Suppliers';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import { Toaster } from 'sonner';
@@ -47,6 +48,7 @@ function App() {
           <Route path="shifts" element={<Shifts />} />
           <Route path="expenses" element={<Expenses />} />
           <Route path="tables" element={<Tables />} />
+          <Route path="suppliers" element={<Suppliers />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

@@ -68,21 +68,31 @@ const Expenses = () => {
             toast.error('Please enter a valid amount');
             return;
         }
+        if (!user) {
+            toast.error('You must be logged in');
+            return;
+        }
         setSubmitting(true);
 
-        const { error } = await supabase.from('expenses').insert({
-            ...form,
-            amount: Number(form.amount),
-            created_by: user.id,
-        });
+        try {
+            const { error } = await supabase.from('expenses').insert({
+                ...form,
+                amount: Number(form.amount),
+                created_by: user.id,
+            });
 
-        if (error) {
-            toast.error('Failed to add expense');
-        } else {
-            toast.success('Expense added!');
-            setForm({ category: 'Rent', description: '', amount: '', expense_date: new Date().toISOString().split('T')[0] });
-            setShowForm(false);
-            fetchExpenses();
+            if (error) {
+                console.error('Insert expense error:', error);
+                toast.error(error.message || 'Failed to add expense');
+            } else {
+                toast.success('Expense added!');
+                setForm({ category: 'Rent', description: '', amount: '', expense_date: new Date().toISOString().split('T')[0] });
+                setShowForm(false);
+                fetchExpenses();
+            }
+        } catch (err) {
+            console.error('Unexpected error:', err);
+            toast.error('Something went wrong');
         }
         setSubmitting(false);
     };

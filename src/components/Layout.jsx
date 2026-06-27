@@ -2,7 +2,7 @@ import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import {
     LayoutDashboard, ShoppingCart, Package, ShoppingBag, Settings as SettingsIcon,
-    Utensils, FileText, TrendingUp, LogOut, Menu, Clock, Receipt, LayoutGrid
+    Utensils, FileText, TrendingUp, LogOut, Menu,     Clock, Receipt, LayoutGrid, Building2
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import NotificationsPanel from './NotificationsPanel';
@@ -21,6 +21,7 @@ const Layout = () => {
         { to: '/inventory', icon: Package, label: 'Inventory', roles: ['admin'] },
         { to: '/procurement', icon: ShoppingBag, label: 'Procurement', roles: ['admin'] },
         { to: '/expenses', icon: Receipt, label: 'Expenses', roles: ['admin'] },
+        { to: '/suppliers', icon: Building2, label: 'Suppliers', roles: ['admin'] },
         { to: '/shifts', icon: Clock, label: 'Shifts', roles: ['admin', 'staff'] },
     ];
 

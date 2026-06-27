@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
 import DailyReport from '../components/DailyReport';
+import { toast } from 'sonner';
 
 const StatCard = ({ title, value, subtext, icon: Icon, color, delay, trend }) => (
     <motion.div
@@ -52,53 +53,55 @@ const Dashboard = () => {
     const [showReport, setShowReport] = useState(false);
 
     async function fetchStats() {
-        const now = new Date();
-        let startOfBusinessDay = new Date(now);
-        if (now.getHours() < 4) startOfBusinessDay.setDate(now.getDate() - 1);
-        startOfBusinessDay.setHours(4, 0, 0, 0);
-        const startOfDay = startOfBusinessDay.toISOString();
+        try {
+            const now = new Date();
+            let startOfBusinessDay = new Date(now);
+            if (now.getHours() < 4) startOfBusinessDay.setDate(now.getDate() - 1);
+            startOfBusinessDay.setHours(4, 0, 0, 0);
+            const startOfDay = startOfBusinessDay.toISOString();
 
-        // This week
-        const weekStart = new Date(now);
-        weekStart.setDate(now.getDate() - 7);
-        weekStart.setHours(4, 0, 0, 0);
+            const weekStart = new Date(now);
+            weekStart.setDate(now.getDate() - 7);
+            weekStart.setHours(4, 0, 0, 0);
 
-        // Last week
-        const lastWeekStart = new Date(weekStart);
-        lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+            const lastWeekStart = new Date(weekStart);
+            lastWeekStart.setDate(lastWeekStart.getDate() - 7);
 
-        const [ordersRes, lowStockRes, pendingRes, weekOrdersRes, lastWeekRes, staffRes] = await Promise.all([
-            supabase.from('orders').select('total_amount, order_items(*, menu_items(name))').gte('created_at', startOfDay).eq('status', 'completed'),
-            supabase.from('ingredients').select('*', { count: 'exact', head: true }).lt('current_stock', 5),
-            supabase.from('orders').select('*', { count: 'exact', head: true }).neq('status', 'completed').neq('status', 'cancelled'),
-            supabase.from('orders').select('total_amount').gte('created_at', weekStart.toISOString()).eq('status', 'completed'),
-            supabase.from('orders').select('total_amount').gte('created_at', lastWeekStart.toISOString()).lt('created_at', weekStart.toISOString()).eq('status', 'completed'),
-            supabase.from('shifts').select('user_id').is('clock_out', null),
-        ]);
+            const [ordersRes, lowStockRes, pendingRes, weekOrdersRes, lastWeekRes, staffRes] = await Promise.all([
+                supabase.from('orders').select('total_amount, order_items(*, menu_items(name))').gte('created_at', startOfDay).eq('status', 'completed'),
+                supabase.from('ingredients').select('*', { count: 'exact', head: true }).lt('current_stock', 5),
+                supabase.from('orders').select('*', { count: 'exact', head: true }).neq('status', 'completed').neq('status', 'cancelled'),
+                supabase.from('orders').select('total_amount').gte('created_at', weekStart.toISOString()).eq('status', 'completed'),
+                supabase.from('orders').select('total_amount').gte('created_at', lastWeekStart.toISOString()).lt('created_at', weekStart.toISOString()).eq('status', 'completed'),
+                supabase.from('shifts').select('user_id').is('clock_out', null),
+            ]);
 
-        const orders = ordersRes.data || [];
-        const dailyRevenue = orders.reduce((sum, o) => sum + Number(o.total_amount), 0);
+            const orders = ordersRes.data || [];
+            const dailyRevenue = orders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
-        // Top item today
-        const itemMap = {};
-        orders.forEach(o => o.order_items?.forEach(item => {
-            const name = item.menu_items?.name || 'Unknown';
-            itemMap[name] = (itemMap[name] || 0) + item.quantity;
-        }));
-        const top = Object.entries(itemMap).sort(([, a], [, b]) => b - a)[0];
-        setTopItem(top ? { name: top[0], count: top[1] } : null);
+            const itemMap = {};
+            orders.forEach(o => o.order_items?.forEach(item => {
+                const name = item.menu_items?.name || 'Unknown';
+                itemMap[name] = (itemMap[name] || 0) + item.quantity;
+            }));
+            const top = Object.entries(itemMap).sort(([, a], [, b]) => b - a)[0];
+            setTopItem(top ? { name: top[0], count: top[1] } : null);
 
-        const weekRevenue = (weekOrdersRes.data || []).reduce((s, o) => s + Number(o.total_amount), 0);
-        const lastWeekRevenue = (lastWeekRes.data || []).reduce((s, o) => s + Number(o.total_amount), 0);
+            const weekRevenue = (weekOrdersRes.data || []).reduce((s, o) => s + Number(o.total_amount || 0), 0);
+            const lastWeekRevenue = (lastWeekRes.data || []).reduce((s, o) => s + Number(o.total_amount || 0), 0);
 
-        setStats({
-            dailyRevenue,
-            orderCount: orders.length,
-            lowStockCount: lowStockRes.count || 0,
-            pendingOrders: pendingRes.count || 0,
-        });
-        setWeekStats({ revenue: weekRevenue, lastWeekRevenue });
-        setStaffOnDuty(staffRes.data || []);
+            setStats({
+                dailyRevenue,
+                orderCount: orders.length,
+                lowStockCount: lowStockRes.count || 0,
+                pendingOrders: pendingRes.count || 0,
+            });
+            setWeekStats({ revenue: weekRevenue, lastWeekRevenue });
+            setStaffOnDuty(staffRes.data || []);
+        } catch (err) {
+            console.error('Dashboard fetch error:', err);
+            toast.error('Failed to load dashboard data');
+        }
     }
 
     useEffect(() => {
