@@ -200,15 +200,7 @@ begin;
   alter publication supabase_realtime add table wastage_logs;
 commit;
 
--- 9. Permissions (from fix_permissions.sql)
-alter table public.menu_items disable row level security;
-alter table public.ingredients disable row level security;
-alter table public.recipes disable row level security;
-alter table public.orders disable row level security;
-alter table public.order_items disable row level security;
-
-grant all on all tables in schema public to anon;
-grant all on all sequences in schema public to anon;
+-- 9. Permissions (RLS enabled with granular policies — apply enable_rls_policies.sql separately)
 grant all on all tables in schema public to authenticated;
 grant all on all sequences in schema public to authenticated;
 grant all on all tables in schema public to service_role;

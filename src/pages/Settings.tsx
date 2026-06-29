@@ -1,0 +1,388 @@
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
+import { useAuthStore } from '../store/authStore';
+import { User, Shield, Save, Users, UserPlus, Building2, Percent, MapPin, Phone } from 'lucide-react';
+import { toast } from 'sonner';
+// eslint-disable-next-line no-unused-vars
+import { motion } from 'framer-motion';
+import { createClient } from '@supabase/supabase-js';
+
+interface BusinessSettings {
+    business_name: string;
+    business_address: string;
+    business_phone: string;
+    tax_rate: string;
+    [key: string]: unknown;
+}
+
+interface TeamMember {
+    id: string;
+    username: string;
+    full_name: string | null;
+    role: string;
+    created_at: string;
+    [key: string]: unknown;
+}
+
+const Settings = () => {
+    const { profile, user } = useAuthStore();
+    const [fullName, setFullName] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [team, setTeam] = useState<TeamMember[]>([]);
+    const [showAddMember, setShowAddMember] = useState(false);
+    const [newMember, setNewMember] = useState({ username: '', password: '', fullName: '' });
+    const [addingMember, setAddingMember] = useState(false);
+
+    const [businessSettings, setBusinessSettings] = useState<BusinessSettings>({
+        business_name: 'Kadé',
+        business_address: '',
+        business_phone: '',
+        tax_rate: '0',
+    });
+    const [savingBusiness, setSavingBusiness] = useState(false);
+
+    useEffect(() => {
+        if (profile) {
+            setFullName(profile.full_name || '');
+        }
+        if (profile?.role === 'admin') {
+            fetchTeam();
+            fetchSettings();
+        }
+    }, [profile]);
+
+    const fetchSettings = async () => {
+        const { data } = await supabase.from('settings').select('*');
+        if (data) {
+            const map: Record<string, string> = {};
+            data.forEach(s => { map[s.key] = s.value; });
+            setBusinessSettings(prev => ({ ...prev, ...map }));
+        }
+    };
+
+    const saveSettings = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSavingBusiness(true);
+        try {
+            for (const [key, value] of Object.entries(businessSettings)) {
+                await supabase.from('settings').upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+            }
+            toast.success('Business settings saved');
+        } catch (err) {
+            console.error('Save settings error:', err);
+            toast.error('Failed to save settings');
+        }
+        setSavingBusiness(false);
+    };
+
+    const fetchTeam = async () => {
+        const { data } = await supabase.from('profiles').select('*').order('created_at');
+        if (data) setTeam(data as TeamMember[]);
+    };
+
+    const updateProfile = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+
+        const { error } = await supabase
+            .from('profiles')
+            .update({ full_name: fullName })
+            .eq('id', user!.id);
+
+        if (error) {
+            toast.error('Failed to update profile');
+        } else {
+            toast.success('Profile updated successfully');
+        }
+        setLoading(false);
+    };
+
+    const addTeamMember = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newMember.username || !newMember.password) {
+            toast.error('Username and password are required');
+            return;
+        }
+
+        setAddingMember(true);
+
+        try {
+            const tempSupabase = createClient(
+                import.meta.env.VITE_SUPABASE_URL as string,
+                import.meta.env.VITE_SUPABASE_ANON_KEY as string
+            );
+
+            const { data: newUser, error: signUpError } = await tempSupabase.auth.signUp({
+                email: `${newMember.username.toLowerCase().replace(/\s+/g, '')}@kade.com`,
+                password: newMember.password,
+            });
+
+            if (signUpError) throw signUpError;
+
+            if (newMember.fullName && newUser.user) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                const { error: updateError } = await supabase
+                    .from('profiles')
+                    .update({ full_name: newMember.fullName })
+                    .eq('id', newUser.user.id);
+
+                if (updateError) console.error('Error updating name:', updateError);
+            }
+
+            toast.success(`Team member '${newMember.username}' created successfully!`);
+            setShowAddMember(false);
+            setNewMember({ username: '', password: '', fullName: '' });
+            fetchTeam();
+        } catch (error) {
+            console.error('Error adding member:', error);
+            toast.error('Failed to create team member: ' + (error as Error).message);
+        } finally {
+            setAddingMember(false);
+        }
+    };
+
+    return (
+        <div className="max-w-4xl mx-auto">
+            <motion.header
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-8"
+            >
+                <h1 className="text-3xl font-bold text-text mb-2">Settings</h1>
+                <p className="text-text-muted">Manage your profile and team settings.</p>
+            </motion.header>
+
+            {showAddMember && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-surface border border-border rounded-3xl p-6 w-full max-w-md shadow-2xl"
+                    >
+                        <h2 className="text-2xl font-bold text-text mb-6">Add Team Member</h2>
+                        <form onSubmit={addTeamMember} className="space-y-4">
+                            <div>
+                                <label className="block text-text-muted text-sm font-bold mb-1">Username</label>
+                                <input
+                                    type="text"
+                                    value={newMember.username}
+                                    onChange={(e) => setNewMember({ ...newMember, username: e.target.value })}
+                                    className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
+                                    placeholder="e.g. john"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-text-muted text-sm font-bold mb-1">Password</label>
+                                <input
+                                    type="password"
+                                    value={newMember.password}
+                                    onChange={(e) => setNewMember({ ...newMember, password: e.target.value })}
+                                    className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
+                                    placeholder="Minimum 6 characters"
+                                    required
+                                    minLength={6}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-text-muted text-sm font-bold mb-1">Full Name (Optional)</label>
+                                <input
+                                    type="text"
+                                    value={newMember.fullName}
+                                    onChange={(e) => setNewMember({ ...newMember, fullName: e.target.value })}
+                                    className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:border-primary focus:outline-none"
+                                    placeholder="e.g. John Doe"
+                                />
+                            </div>
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAddMember(false)}
+                                    className="flex-1 py-3 font-bold text-text-muted hover:bg-surface-hover rounded-xl transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={addingMember}
+                                    className="flex-1 py-3 bg-primary text-bg font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+                                >
+                                    {addingMember ? 'Creating...' : 'Add Member'}
+                                </button>
+                            </div>
+                        </form>
+                    </motion.div>
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.1 }}
+                    className="glass p-6 rounded-3xl"
+                >
+                    <div className="flex items-center gap-3 mb-6 border-b border-border pb-4">
+                        <User className="text-primary" size={24} />
+                        <h2 className="text-xl font-bold text-text">My Profile</h2>
+                    </div>
+
+                    <form onSubmit={updateProfile} className="space-y-4">
+                        <div>
+                            <label className="text-sm font-bold text-text-muted ml-1">Username</label>
+                            <input
+                                type="text"
+                                value={profile?.username || ''}
+                                disabled
+                                className="w-full bg-surface/50 border border-border rounded-xl py-3 px-4 text-text-muted cursor-not-allowed mt-1"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-bold text-text-muted ml-1">Role</label>
+                            <div className="flex items-center gap-2 mt-1 px-4 py-3 bg-surface/50 border border-border rounded-xl text-text-muted">
+                                <Shield size={16} />
+                                <span className="capitalize">{profile?.role}</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-sm font-bold text-text-muted ml-1">Full Name</label>
+                            <input
+                                type="text"
+                                value={fullName}
+                                onChange={(e) => setFullName(e.target.value)}
+                                className="w-full bg-surface border border-border rounded-xl py-3 px-4 text-text focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all mt-1"
+                                placeholder="Enter your name"
+                            />
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full bg-primary text-bg font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:brightness-110 transition-all mt-4"
+                        >
+                            <Save size={18} />
+                            {loading ? 'Saving...' : 'Save Changes'}
+                        </button>
+                    </form>
+                </motion.div>
+
+                {profile?.role === 'admin' && (
+                    <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.15 }}
+                        className="glass p-6 rounded-3xl"
+                    >
+                        <div className="flex items-center gap-3 mb-6 border-b border-border pb-4">
+                            <Building2 className="text-primary" size={24} />
+                            <h2 className="text-xl font-bold text-text">Business Settings</h2>
+                        </div>
+
+                        <form onSubmit={saveSettings} className="space-y-4">
+                            <div>
+                                <label className="text-sm font-bold text-text-muted ml-1 flex items-center gap-1">
+                                    <Building2 size={14} /> Business Name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={businessSettings.business_name}
+                                    onChange={e => setBusinessSettings({ ...businessSettings, business_name: e.target.value })}
+                                    className="w-full bg-surface border border-border rounded-xl py-3 px-4 text-text focus:outline-none focus:border-primary/50 transition-all mt-1"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-bold text-text-muted ml-1 flex items-center gap-1">
+                                    <MapPin size={14} /> Address
+                                </label>
+                                <input
+                                    type="text"
+                                    value={businessSettings.business_address}
+                                    onChange={e => setBusinessSettings({ ...businessSettings, business_address: e.target.value })}
+                                    className="w-full bg-surface border border-border rounded-xl py-3 px-4 text-text focus:outline-none focus:border-primary/50 transition-all mt-1"
+                                    placeholder="Business address for receipts"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-bold text-text-muted ml-1 flex items-center gap-1">
+                                    <Phone size={14} /> Phone
+                                </label>
+                                <input
+                                    type="text"
+                                    value={businessSettings.business_phone}
+                                    onChange={e => setBusinessSettings({ ...businessSettings, business_phone: e.target.value })}
+                                    className="w-full bg-surface border border-border rounded-xl py-3 px-4 text-text focus:outline-none focus:border-primary/50 transition-all mt-1"
+                                    placeholder="Phone number for receipts"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-bold text-text-muted ml-1 flex items-center gap-1">
+                                    <Percent size={14} /> Tax Rate (%)
+                                </label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.01"
+                                    value={businessSettings.tax_rate}
+                                    onChange={e => setBusinessSettings({ ...businessSettings, tax_rate: e.target.value })}
+                                    className="w-full bg-surface border border-border rounded-xl py-3 px-4 text-text focus:outline-none focus:border-primary/50 transition-all mt-1"
+                                    placeholder="e.g. 10"
+                                />
+                                <p className="text-xs text-text-muted mt-1">Applied to all POS orders. Set to 0 to disable tax.</p>
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={savingBusiness}
+                                className="w-full bg-primary text-bg font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:brightness-110 transition-all mt-4"
+                            >
+                                <Save size={18} />
+                                {savingBusiness ? 'Saving...' : 'Save Business Settings'}
+                            </button>
+                        </form>
+                    </motion.div>
+                )}
+
+                {profile?.role === 'admin' && (
+                    <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="glass p-6 rounded-3xl"
+                    >
+                        <div className="flex items-center justify-between mb-6 border-b border-border pb-4">
+                            <div className="flex items-center gap-3">
+                                <Users className="text-secondary" size={24} />
+                                <h2 className="text-xl font-bold text-text">Team Members</h2>
+                            </div>
+                            <button
+                                onClick={() => setShowAddMember(true)}
+                                className="bg-secondary text-bg p-2 rounded-lg hover:scale-105 transition-transform"
+                            >
+                                <UserPlus size={20} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-3">
+                            {team.map((member) => (
+                                <div key={member.id} className="flex items-center justify-between bg-surface p-3 rounded-xl border border-border">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                                            {member.username?.[0]?.toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <div className="font-bold text-text">{member.full_name || member.username}</div>
+                                            <div className="text-xs text-text-muted capitalize">{member.role}</div>
+                                        </div>
+                                    </div>
+                                    {member.role === 'admin' && <Shield size={16} className="text-secondary" />}
+                                </div>
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default Settings;

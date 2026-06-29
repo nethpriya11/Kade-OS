@@ -13,10 +13,10 @@ CREATE TABLE IF NOT EXISTS public.wastage_logs (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- 3. Disable RLS on relevant tables to avoid permission issues
-ALTER TABLE public.ingredients DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.wastage_logs DISABLE ROW LEVEL SECURITY;
+-- 3. Enable RLS on tables
+ALTER TABLE public.ingredients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.wastage_logs ENABLE ROW LEVEL SECURITY;
 
--- 4. Grant permissions to anon and authenticated roles
-GRANT ALL ON public.ingredients TO anon, authenticated, service_role;
-GRANT ALL ON public.wastage_logs TO anon, authenticated, service_role;
+-- 4. Grant permissions to authenticated roles only
+GRANT ALL ON public.ingredients TO authenticated, service_role;
+GRANT ALL ON public.wastage_logs TO authenticated, service_role;
