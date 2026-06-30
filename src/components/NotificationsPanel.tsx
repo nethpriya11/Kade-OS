@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Bell, X, AlertTriangle, ShoppingBag, Package, Clock } from 'lucide-react';
-// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
 
 const NOTIF_KEY = 'kade_notifications';
@@ -31,6 +30,7 @@ const NOTIF_ICONS: Record<string, { icon: React.ComponentType<{ size?: number }>
 
 let globalAddNotif: ((notif: Omit<Notification, 'id' | 'time' | 'read'>) => void) | null = null;
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const addNotification = (notif: Omit<Notification, 'id' | 'time' | 'read'>) => {
     if (globalAddNotif) globalAddNotif(notif);
 };

@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
-import { Utensils, Plus, Trash2, Save, ChevronRight, ChefHat, Edit2, Check, X, Search, Filter } from 'lucide-react';
+import SearchInput from '../components/SearchInput';
+import { Utensils, Plus, Trash2, ChevronRight, ChefHat, Edit2, Check, X } from 'lucide-react';
 
 interface MenuItem {
     id: string;
@@ -56,13 +57,13 @@ const Menu = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All');
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         const { data: menu } = await supabase.from('menu_items').select('*').order('category');
         const { data: ing } = await supabase.from('ingredients').select('*').order('name');
 
         if (menu) setMenuItems(menu as MenuItem[]);
         if (ing) setIngredients(ing as Ingredient[]);
-    };
+    }, []);
 
     const fetchRecipe = async (menuId: string) => {
         const { data } = await supabase
@@ -75,7 +76,14 @@ const Menu = () => {
 
     useEffect(() => {
         fetchData();
-    }, []);
+
+        const subscription = supabase
+            .channel('menu_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, fetchData)
+            .subscribe();
+
+        return () => { subscription.unsubscribe(); };
+    }, [fetchData]);
 
     useEffect(() => {
         if (selectedItem) {
@@ -282,16 +290,11 @@ const Menu = () => {
                 </div>
 
                 <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={20} />
-                        <input
-                            type="text"
-                            placeholder="Search menu..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full md:w-64 bg-bg border border-border rounded-xl pl-10 pr-4 py-3 text-text focus:border-primary focus:outline-none"
-                        />
-                    </div>
+                    <SearchInput
+                        value={searchQuery}
+                        onChange={setSearchQuery}
+                        placeholder="Search menu..."
+                    />
                     <button
                         onClick={() => setIsCreating(true)}
                         className="flex items-center justify-center gap-2 bg-primary text-bg font-bold px-6 py-3 rounded-xl hover:opacity-90 transition-opacity"
@@ -690,3 +693,4 @@ const Menu = () => {
 };
 
 export default Menu;
+

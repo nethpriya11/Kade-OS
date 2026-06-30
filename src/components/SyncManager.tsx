@@ -1,10 +1,24 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useOfflineStore } from '../store/offlineStore';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
-import { Wifi, WifiOff, RefreshCw } from 'lucide-react';
-// eslint-disable-next-line no-unused-vars
+import { WifiOff, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+interface QueuedOrderData {
+    queuedAt?: string;
+    items?: { id: string; cartItemId?: string; original_id?: string; name: string; price: number; quantity: number; portion?: string; [key: string]: unknown }[];
+    total_amount?: number;
+    payment_method?: string;
+    created_at?: string;
+    discount_amount?: number | null;
+    discount_type?: string | null;
+    table_number?: number | null;
+    customer_name?: string | null;
+    tax_rate?: number;
+    tax_amount?: number;
+    [key: string]: unknown;
+}
 
 const SyncManager = () => {
     const { isOnline, setOnlineStatus, offlineQueue, removeFromQueue } = useOfflineStore();
@@ -17,7 +31,7 @@ const SyncManager = () => {
         let syncedCount = 0;
 
         for (const raw of offlineQueue) {
-            const orderData = raw as any;
+            const orderData = raw as QueuedOrderData;
             try {
                 const { data: order, error: orderError } = await supabase
                     .from('orders')
@@ -47,7 +61,7 @@ const SyncManager = () => {
                         .eq('table_number', orderData.table_number);
                 }
 
-                const orderItems = (orderData.items as any[]).map((item: any) => ({
+                const orderItems = (orderData.items ?? []).map((item) => ({
                     order_id: order.id,
                     menu_item_id: item.original_id || item.id,
                     quantity: item.quantity,
@@ -61,7 +75,7 @@ const SyncManager = () => {
 
                 if (itemsError) throw itemsError;
 
-                removeFromQueue(orderData.queuedAt);
+                if (orderData.queuedAt) removeFromQueue(orderData.queuedAt);
                 syncedCount++;
 
             } catch (error) {
@@ -137,3 +151,4 @@ const SyncManager = () => {
 };
 
 export default SyncManager;
+

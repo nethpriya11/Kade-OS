@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { LayoutGrid, Circle, Users, Clock } from 'lucide-react';
-// eslint-disable-next-line no-unused-vars
+import { LayoutGrid, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
@@ -60,7 +59,6 @@ const Tables = () => {
     };
 
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchData();
         const channel = supabase
             .channel('tables_realtime')
@@ -210,3 +208,4 @@ const Tables = () => {
 };
 
 export default Tables;
+

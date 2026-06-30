@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import type { User } from '@supabase/supabase-js';
+import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { logAuthAction } from '../lib/auditLog';
 
 export interface Profile {
@@ -20,6 +20,21 @@ interface AuthState {
     signOut: () => Promise<void>;
 }
 
+    let _authListener: { data: { subscription: { unsubscribe: () => void } } } | null = null;
+
+const handleAuthChange = async (_event: AuthChangeEvent, session: Session | null) => {
+    if (session) {
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single<Profile>();
+        useAuthStore.setState({ user: session.user, profile, loading: false });
+    } else {
+        useAuthStore.setState({ user: null, profile: null, loading: false });
+    }
+};
+
 export const useAuthStore = create<AuthState>((set) => ({
     user: null,
     profile: null,
@@ -28,32 +43,28 @@ export const useAuthStore = create<AuthState>((set) => ({
     initialize: async () => {
         set({ loading: true });
 
-        const { data: { session } } = await supabase.auth.getSession();
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
 
-        if (session) {
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single<Profile>();
-
-            set({ user: session.user, profile, loading: false });
-        } else {
-            set({ user: null, profile: null, loading: false });
-        }
-
-        supabase.auth.onAuthStateChange(async (_event, session) => {
             if (session) {
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('*')
                     .eq('id', session.user.id)
                     .single<Profile>();
+
                 set({ user: session.user, profile, loading: false });
             } else {
                 set({ user: null, profile: null, loading: false });
             }
-        });
+        } catch {
+            set({ user: null, profile: null, loading: false });
+        }
+
+        if (_authListener) {
+            _authListener.data.subscription.unsubscribe();
+        }
+        _authListener = supabase.auth.onAuthStateChange(handleAuthChange) as typeof _authListener;
     },
 
     signOut: async () => {

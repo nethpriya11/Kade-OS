@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-interface Ingredient {
+export interface Ingredient {
     id: string;
     name: string;
     category: string;

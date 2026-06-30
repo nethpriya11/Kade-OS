@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 interface QueuedOrder {
-    queuedAt: string;
+    queuedAt?: string;
     [key: string]: unknown;
 }
 

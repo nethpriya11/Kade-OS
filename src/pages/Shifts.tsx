@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
-import { Clock, LogIn, LogOut, Users, Calendar, Timer, ChevronDown, CheckCircle } from 'lucide-react';
-// eslint-disable-next-line no-unused-vars
-import { motion, AnimatePresence } from 'framer-motion';
+import { Clock, LogIn, LogOut, Users, Calendar } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
 interface Shift {
@@ -52,7 +51,7 @@ const Shifts = () => {
     const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
     const [activeTab, setActiveTab] = useState('my');
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         if (!user) return;
         setLoading(true);
 
@@ -103,7 +102,7 @@ const Shifts = () => {
         }
 
         setLoading(false);
-    };
+    }, [user, filterDate, profile?.role]);
 
     useEffect(() => {
         fetchData();
@@ -114,11 +113,11 @@ const Shifts = () => {
             .subscribe(() => { /* noop */ });
 
         return () => { sub.unsubscribe(); };
-    }, [user, filterDate]);
+    }, [user, filterDate, fetchData]);
 
     useEffect(() => {
         if (profile?.role === 'admin') fetchData();
-    }, [filterDate]);
+    }, [filterDate, fetchData, profile?.role]);
 
     const handleClockIn = async () => {
         const { data, error } = await supabase
@@ -374,3 +373,4 @@ const Shifts = () => {
 };
 
 export default Shifts;
+

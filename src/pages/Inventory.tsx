@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { predictCategory } from '../lib/gemini';
 import { useAuthStore } from '../store/authStore';
-import { useInventoryStore } from '../store/inventoryStore';
+import { useInventoryStore, type Ingredient } from '../store/inventoryStore';
 import { logInventoryAction, logWastageAction } from '../lib/auditLog';
-import { Package, AlertTriangle, Save, Plus, Search, X, Check, Edit2, Trash2, MinusCircle, Sparkles, History } from 'lucide-react';
+import SearchInput from '../components/SearchInput';
+import { Package, AlertTriangle, Plus, X, Edit2, Trash2, MinusCircle, Sparkles, History } from 'lucide-react';
 import { toast } from 'sonner';
 
 const DEFAULT_CATEGORIES = ['Produce', 'Meat', 'Spices', 'Dairy', 'Dry Goods', 'Bakery', 'Other'];
@@ -227,7 +228,7 @@ const Inventory = () => {
 
             if (result.error) throw result.error;
 
-            useInventoryStore.getState().addIngredient(result.data as never);
+            if (result.data) useInventoryStore.getState().addIngredient(result.data as unknown as Ingredient);
 
             setIsCreating(false);
             setNewIngredient({
@@ -506,16 +507,11 @@ const Inventory = () => {
                         </div>
 
                         <div className="flex gap-3 w-full md:w-auto">
-                            <div className="relative flex-1 md:w-64">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={20} />
-                                <input
-                                    type="text"
-                                    placeholder="Search..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full bg-bg border border-border rounded-xl pl-10 pr-4 py-3 text-text focus:border-primary focus:outline-none"
-                                />
-                            </div>
+                            <SearchInput
+                                value={searchQuery}
+                                onChange={setSearchQuery}
+                                placeholder="Search..."
+                            />
                             <button
                                 onClick={openHistory}
                                 className="flex items-center justify-center gap-2 bg-surface hover:bg-surface-hover text-text border border-border px-4 py-3 rounded-xl transition-colors"
@@ -1052,3 +1048,4 @@ const Inventory = () => {
 };
 
 export default Inventory;
+

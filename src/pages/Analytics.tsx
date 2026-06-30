@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { TrendingUp, DollarSign, ShoppingBag, AlertTriangle, Download, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import {
@@ -454,3 +454,4 @@ const Analytics = () => {
 };
 
 export default Analytics;
+

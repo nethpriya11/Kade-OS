@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, X, Sparkles, ChefHat } from 'lucide-react';
+import { Send, X, Sparkles, ChefHat } from 'lucide-react';
 import { askGemini } from '../lib/gemini';
 
 interface Message {

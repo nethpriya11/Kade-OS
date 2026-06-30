@@ -28,7 +28,7 @@ describe('offlineStore', () => {
     it('should remove order from queue by timestamp', () => {
         const order = { id: '1', total_amount: 100 };
         useOfflineStore.getState().addToQueue(order as never);
-        const timestamp = useOfflineStore.getState().offlineQueue[0].queuedAt;
+        const timestamp = useOfflineStore.getState().offlineQueue[0].queuedAt!;
         useOfflineStore.getState().removeFromQueue(timestamp);
         expect(useOfflineStore.getState().offlineQueue).toHaveLength(0);
     });

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { logProcurementAction } from '../lib/auditLog';
-import { ShoppingBag, CheckCircle, AlertCircle, Truck, RotateCcw, Download, Plus, X } from 'lucide-react';
+import { ShoppingBag, CheckCircle, RotateCcw, Download, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Ingredient {
@@ -81,14 +81,14 @@ const Procurement = () => {
         }
     };
 
-    const fetchItems = async () => {
+    const fetchItems = useCallback(async () => {
         const { data } = await supabase
             .from('ingredients')
             .select('*')
             .order('current_stock', { ascending: true });
         if (data) setItems(data as Ingredient[]);
         setLoading(false);
-    };
+    }, []);
 
     const fetchProcurementOrder = async () => {
         const { data: existingOrder } = await supabase
@@ -127,6 +127,8 @@ const Procurement = () => {
         if (data) setRestockLogs(data as unknown as RestockLogItem[]);
     };
 
+    const channelRef = React.useRef<ReturnType<typeof supabase.channel> | null>(null);
+
     useEffect(() => {
         const savedNotes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}');
         setNotes(savedNotes);
@@ -134,7 +136,18 @@ const Procurement = () => {
         fetchHistory();
         fetchSupplierPrices();
         fetchProcurementOrder();
-    }, []);
+
+        channelRef.current = supabase
+            .channel('procurement_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'ingredients' }, fetchItems)
+            .subscribe();
+
+        return () => {
+            if (channelRef.current) {
+                channelRef.current.unsubscribe();
+            }
+        };
+    }, [fetchItems]);
 
     const getUserId = useCallback(async () => {
         const { data: { user } } = await supabase.auth.getUser();
@@ -235,7 +248,6 @@ const Procurement = () => {
 
     const exportList = () => {
         const displayItems = items.filter(item => {
-            const itemKey = `${item.id}_${item.name}`;
             const status = procurementItems[item.id]?.status || 'needed';
             return filter === 'all' || status === filter;
         });

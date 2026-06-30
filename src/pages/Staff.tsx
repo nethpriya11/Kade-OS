@@ -3,9 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { Users, UserPlus, Shield, Trash2, Save, X, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
-// eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
-import { createClient } from '@supabase/supabase-js';
 
 interface TeamMember {
     id: string;
@@ -25,6 +23,11 @@ const Staff = () => {
     const [editId, setEditId] = useState<string | null>(null);
     const [editValues, setEditValues] = useState({ full_name: '', role: '' });
 
+    const fetchTeam = async () => {
+        const { data } = await supabase.from('profiles').select('*').order('created_at');
+        if (data) setTeam(data as TeamMember[]);
+    };
+
     useEffect(() => {
         fetchTeam();
         const channel = supabase
@@ -34,11 +37,6 @@ const Staff = () => {
         return () => { channel.unsubscribe(); };
     }, []);
 
-    const fetchTeam = async () => {
-        const { data } = await supabase.from('profiles').select('*').order('created_at');
-        if (data) setTeam(data as TeamMember[]);
-    };
-
     const addTeamMember = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newMember.username || !newMember.password) {
@@ -47,12 +45,7 @@ const Staff = () => {
         }
         setAddingMember(true);
         try {
-            const tempSupabase = createClient(
-                import.meta.env.VITE_SUPABASE_URL as string,
-                import.meta.env.VITE_SUPABASE_ANON_KEY as string
-            );
-
-            const { data: newUser, error: signUpError } = await tempSupabase.auth.signUp({
+            const { data: newUser, error: signUpError } = await supabase.auth.signUp({
                 email: `${newMember.username.toLowerCase().replace(/\s+/g, '')}@kade.com`,
                 password: newMember.password,
             });

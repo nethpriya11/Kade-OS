@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Building2, Plus, X, Save, Phone, Mail, MapPin, User, Trash2, Package } from 'lucide-react';
-// eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
@@ -45,21 +44,28 @@ const Suppliers = () => {
     const [supplierPrices, setSupplierPrices] = useState<SupplierPrice[]>([]);
     const [ingredients, setIngredients] = useState<Ingredient[]>([]);
 
-    useEffect(() => {
-        fetchSuppliers();
-        fetchIngredients();
-    }, []);
-
-    const fetchSuppliers = async () => {
+    const fetchSuppliers = useCallback(async () => {
         const { data } = await supabase.from('suppliers').select('*').order('name');
         if (data) setSuppliers(data as Supplier[]);
         setLoading(false);
-    };
+    }, []);
 
-    const fetchIngredients = async () => {
+    const fetchIngredients = useCallback(async () => {
         const { data } = await supabase.from('ingredients').select('id, name, unit, purchase_price');
         if (data) setIngredients(data as Ingredient[]);
-    };
+    }, []);
+
+    useEffect(() => {
+        fetchSuppliers();
+        fetchIngredients();
+
+        const subscription = supabase
+            .channel('suppliers_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'suppliers' }, fetchSuppliers)
+            .subscribe();
+
+        return () => { subscription.unsubscribe(); };
+    }, [fetchSuppliers, fetchIngredients]);
 
     const fetchSupplierPrices = async (supplierId: string) => {
         const { data } = await supabase.from('supplier_prices').select('*').eq('supplier_id', supplierId);

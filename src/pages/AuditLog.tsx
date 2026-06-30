@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
-import { History, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
-// eslint-disable-next-line no-unused-vars
+import { History, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface AuditEntry {
@@ -33,10 +32,13 @@ const AuditLog = () => {
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(false);
     const [filterEntity, setFilterEntity] = useState('All');
-    const [filterAction, setFilterAction] = useState('');
+    const [filterAction] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
 
-    const fetchLogs = async (pageNum: number) => {
+    const pageRef = useRef(page);
+    useEffect(function syncPageRef() { pageRef.current = page; }, [page]);
+
+    const fetchLogs = useCallback(async (pageNum: number) => {
         setLoading(true);
         const from = pageNum * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
@@ -58,16 +60,27 @@ const AuditLog = () => {
         if (data) setEntries(data as unknown as AuditEntry[]);
         setHasMore(count !== null && from + PAGE_SIZE < count);
         setLoading(false);
-    };
+    }, [filterEntity, filterAction]);
 
     useEffect(() => {
         setPage(0);
         fetchLogs(0);
-    }, [filterEntity, filterAction]);
+    }, [fetchLogs]);
 
     useEffect(() => {
         fetchLogs(page);
-    }, [page]);
+    }, [page, fetchLogs]);
+
+    useEffect(() => {
+        const subscription = supabase
+            .channel('audit_log_changes')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'audit_logs' }, () => {
+                fetchLogs(pageRef.current);
+            })
+            .subscribe();
+
+        return () => { subscription.unsubscribe(); };
+    }, [fetchLogs]);
 
     const filteredEntries = searchQuery
         ? entries.filter(e =>
@@ -201,3 +214,4 @@ const AuditLog = () => {
 };
 
 export default AuditLog;
+

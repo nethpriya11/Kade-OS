@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { TrendingUp, DollarSign, AlertTriangle, Download, Receipt } from 'lucide-react';
+import { Download, Receipt } from 'lucide-react';
 import {
-    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+    Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, BarChart, Bar, Legend, ComposedChart, Line
 } from 'recharts';
 
@@ -125,7 +125,7 @@ const ProfitLoss = () => {
     const [hourlyData, setHourlyData] = useState<HourlyEntry[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const getDateRange = () => {
+    const getDateRange = useCallback(() => {
         const now = new Date();
         let startDate = new Date(now);
         if (now.getHours() < 4) startDate.setDate(now.getDate() - 1);
@@ -146,7 +146,7 @@ const ProfitLoss = () => {
         else if (timeRange === 'year') startDate.setFullYear(startDate.getFullYear() - 1);
 
         return { start: startDate, end: now };
-    };
+    }, [timeRange, customFrom, customTo]);
 
     const processPnL = (orders: Order[], wastage: WastageLog[], expenses: Expense[], _ingredients: Ingredient[], recipes: Recipe[]) => {
         const completedOrders = orders.filter(o => o.status === 'completed');
@@ -231,7 +231,7 @@ const ProfitLoss = () => {
         setHourlyData(hourMap.filter(h => h.revenue > 0 || (h.hour >= '06:00' && h.hour <= '22:00')));
     };
 
-    async function fetchData() {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         const { start, end } = getDateRange();
 
@@ -251,7 +251,7 @@ const ProfitLoss = () => {
 
         processPnL(orders, wastage, expenses, ingredients, recipes);
         setLoading(false);
-    }
+    }, [getDateRange]);
 
     useEffect(() => {
         fetchData();
@@ -262,7 +262,7 @@ const ProfitLoss = () => {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, fetchData)
             .subscribe();
         return () => { sub.unsubscribe(); };
-    }, [timeRange, customFrom, customTo]);
+    }, [timeRange, customFrom, customTo, fetchData]);
 
     const exportCSV = () => {
         const rows = [
@@ -439,3 +439,4 @@ const ProfitLoss = () => {
 };
 
 export default ProfitLoss;
+

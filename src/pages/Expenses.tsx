@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
-import { Receipt, Plus, Trash2, Filter, Download, TrendingDown, Calendar } from 'lucide-react';
-// eslint-disable-next-line no-unused-vars
+import { Receipt, Plus, Trash2, Download, TrendingDown, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -41,7 +40,7 @@ const Expenses = () => {
     const [submitting, setSubmitting] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
-    const fetchExpenses = async () => {
+    const fetchExpenses = useCallback(async () => {
         setLoading(true);
         const start = `${filterMonth}-01`;
         const end = new Date(filterMonth + '-01');
@@ -62,7 +61,7 @@ const Expenses = () => {
         const { data } = await query;
         if (data) setExpenses(data as Expense[]);
         setLoading(false);
-    };
+    }, [filterMonth, filterCategory]);
 
     useEffect(() => {
         fetchExpenses();
@@ -72,7 +71,7 @@ const Expenses = () => {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, fetchExpenses)
             .subscribe();
         return () => { sub.unsubscribe(); };
-    }, [filterMonth, filterCategory]);
+    }, [filterMonth, filterCategory, fetchExpenses]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

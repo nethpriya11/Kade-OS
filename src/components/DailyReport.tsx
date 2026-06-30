@@ -1,8 +1,27 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { X, Printer, TrendingUp, ShoppingBag, DollarSign, AlertTriangle, Award, Clock } from 'lucide-react';
-// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
+
+interface OrderRow {
+    status?: string;
+    total_amount?: number;
+    tax_amount?: number;
+    payment_method?: string;
+    created_at?: string;
+    order_items?: { menu_items?: { cost?: number; name?: string } | null; price_at_time?: number; quantity?: number }[] | null;
+    [key: string]: unknown;
+}
+
+interface WastageRow {
+    cost_at_time?: number | null;
+    [key: string]: unknown;
+}
+
+interface ExpenseRow {
+    amount?: number;
+    [key: string]: unknown;
+}
 
 interface DailyReportProps {
     onClose: () => void;
@@ -41,24 +60,24 @@ const DailyReport = ({ onClose }: DailyReportProps) => {
             supabase.from('expenses').select('*').gte('expense_date', start.toISOString().split('T')[0]),
         ]);
 
-        const orders = ordersRes.data || [];
-        const wastage = wastageRes.data || [];
-        const expenses = expensesRes.data || [];
+        const orders = (ordersRes.data ?? []) as OrderRow[];
+        const wastage = (wastageRes.data ?? []) as WastageRow[];
+        const expenses = (expensesRes.data ?? []) as ExpenseRow[];
 
         const completedOrders = orders.filter(o => o.status === 'completed');
-        const revenue = completedOrders.reduce((s: number, o: any) => s + Number(o.total_amount || 0), 0);
+        const revenue = completedOrders.reduce((s, o) => s + Number(o.total_amount || 0), 0);
         const totalOrders = completedOrders.length;
-        const cancelledOrders = orders.filter((o: any) => o.status === 'cancelled').length;
+        const cancelledOrders = orders.filter(o => o.status === 'cancelled').length;
         const avgOrderValue = totalOrders > 0 ? revenue / totalOrders : 0;
-        const wastageCost = wastage.reduce((s: number, w: any) => s + Number(w.cost_at_time || 0), 0);
-        const totalExpenses = expenses.reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
-        const taxCollected = completedOrders.reduce((s: number, o: any) => s + Number(o.tax_amount || 0), 0);
+        const wastageCost = wastage.reduce((s, w) => s + Number(w.cost_at_time || 0), 0);
+        const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+        const taxCollected = completedOrders.reduce((s, o) => s + Number(o.tax_amount || 0), 0);
 
         let totalCOGS = 0;
-        completedOrders.forEach((order: any) => {
-            order.order_items?.forEach((item: any) => {
-                const itemCost = item.menu_items?.cost || (item.price_at_time * 0.3);
-                totalCOGS += itemCost * item.quantity;
+        completedOrders.forEach(order => {
+            order.order_items?.forEach(item => {
+                const itemCost = item.menu_items?.cost || (item.price_at_time ?? 0) * 0.3;
+                totalCOGS += itemCost * (item.quantity ?? 1);
             });
         });
 
@@ -66,21 +85,21 @@ const DailyReport = ({ onClose }: DailyReportProps) => {
         const profitMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
 
         const itemMap: Record<string, number> = {};
-        orders.forEach((o: any) => o.order_items?.forEach((item: any) => {
+        orders.forEach(o => o.order_items?.forEach(item => {
             const name = item.menu_items?.name || 'Unknown';
-            itemMap[name] = (itemMap[name] || 0) + item.quantity;
+            itemMap[name] = (itemMap[name] || 0) + (item.quantity ?? 1);
         }));
         const topItem: [string, number] | null = Object.entries(itemMap).sort(([, a], [, b]) => b - a)[0] || null;
 
         const payMap: Record<string, number> = {};
-        orders.filter((o: any) => o.status === 'completed').forEach((o: any) => {
-            const pm = (o.payment_method || 'cash').toUpperCase();
+        orders.filter(o => o.status === 'completed').forEach(o => {
+            const pm = ((o.payment_method as string) || 'cash').toUpperCase();
             payMap[pm] = (payMap[pm] || 0) + Number(o.total_amount || 0);
         });
 
         const hourMap: Record<string, number> = {};
-        orders.forEach((o: any) => {
-            const h = new Date(o.created_at).getHours();
+        orders.forEach(o => {
+            const h = new Date(o.created_at ?? Date.now()).getHours();
             hourMap[h] = (hourMap[h] || 0) + 1;
         });
         const busiestHour: [string, number] | null = Object.entries(hourMap).sort(([, a], [, b]) => b - a)[0] || null;
@@ -90,7 +109,6 @@ const DailyReport = ({ onClose }: DailyReportProps) => {
     };
 
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchReport();
     }, []);
 
@@ -257,3 +275,4 @@ const DailyReport = ({ onClose }: DailyReportProps) => {
 };
 
 export default DailyReport;
+

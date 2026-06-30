@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { evaluate } from 'mathjs';
 import { Calculator as CalcIcon, X, Delete } from 'lucide-react';
 
@@ -8,21 +8,21 @@ const Calculator = () => {
     const [equation, setEquation] = useState('');
     const [isNewNumber, setIsNewNumber] = useState(true);
 
-    const handleNumber = (num: number | string) => {
+    const handleNumber = useCallback((num: number | string) => {
         if (isNewNumber) {
             setDisplay(num.toString());
             setIsNewNumber(false);
         } else {
             setDisplay(display === '0' ? num.toString() : display + num);
         }
-    };
+    }, [isNewNumber, display]);
 
-    const handleOperator = (op: string) => {
+    const handleOperator = useCallback((op: string) => {
         setEquation(display + ' ' + op + ' ');
         setIsNewNumber(true);
-    };
+    }, [display]);
 
-    const handleEqual = () => {
+    const handleEqual = useCallback(() => {
         try {
             const expr = (equation + display).replace(/x/g, '*');
             const result = evaluate(expr);
@@ -33,7 +33,7 @@ const Calculator = () => {
             setDisplay('Error');
             setIsNewNumber(true);
         }
-    };
+    }, [equation, display]);
 
     const handleClear = () => {
         setDisplay('0');
@@ -41,21 +41,21 @@ const Calculator = () => {
         setIsNewNumber(true);
     };
 
-    const handleBackspace = () => {
+    const handleBackspace = useCallback(() => {
         if (display.length > 1) {
             setDisplay(display.slice(0, -1));
         } else {
             setDisplay('0');
             setIsNewNumber(true);
         }
-    };
+    }, [display]);
 
-    const handleDecimal = () => {
+    const handleDecimal = useCallback(() => {
         if (!display.includes('.')) {
             setDisplay(display + '.');
             setIsNewNumber(false);
         }
-    };
+    }, [display]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -77,7 +77,7 @@ const Calculator = () => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, display, equation, isNewNumber]);
+    }, [isOpen, handleNumber, handleOperator, handleDecimal, handleEqual, handleBackspace]);
 
     return (
         <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end">
@@ -141,3 +141,4 @@ const Calculator = () => {
 };
 
 export default Calculator;
+

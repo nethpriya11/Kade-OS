@@ -1,44 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { supabase } from '../lib/supabase';
 import { TrendingUp, TrendingDown, ShoppingBag, DollarSign, AlertCircle, Clock, Users, FileText, BarChart2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { useDashboardData } from '../hooks/useDashboard';
 import DailyReport from '../components/DailyReport';
-import { toast } from 'sonner';
-
-interface Stats {
-    dailyRevenue: number;
-    orderCount: number;
-    lowStockCount: number;
-    pendingOrders: number;
-}
-
-interface WeekStats {
-    revenue: number;
-    lastWeekRevenue: number;
-}
-
-interface TopItem {
-    name: string;
-    count: number;
-}
-
-interface StaffMember {
-    user_id: string;
-}
 
 interface StatCardProps {
     title: string;
     value: string | number;
     subtext?: string;
     color: string;
-    delay: number;
     trend?: number | null;
     children: React.ReactNode;
 }
 
-const StatCard = ({ title, value, subtext, color, delay, trend, children }: StatCardProps) => (
+const StatCard = ({ title, value, subtext, color, trend, children }: StatCardProps) => (
     <div
         className="glass p-6 rounded-3xl hover:bg-surface-hover transition-all duration-300 group relative overflow-hidden"
     >
@@ -74,76 +51,11 @@ const getGreeting = () => {
 
 const Dashboard = () => {
     const { profile } = useAuthStore();
-    const [stats, setStats] = useState<Stats>({ dailyRevenue: 0, orderCount: 0, lowStockCount: 0, pendingOrders: 0 });
-    const [weekStats, setWeekStats] = useState<WeekStats>({ revenue: 0, lastWeekRevenue: 0 });
-    const [topItem, setTopItem] = useState<TopItem | null>(null);
-    const [staffOnDuty, setStaffOnDuty] = useState<StaffMember[]>([]);
+    const { data } = useDashboardData();
     const [showReport, setShowReport] = useState(false);
 
-    async function fetchStats() {
-        try {
-            const now = new Date();
-            let startOfBusinessDay = new Date(now);
-            if (now.getHours() < 4) startOfBusinessDay.setDate(now.getDate() - 1);
-            startOfBusinessDay.setHours(4, 0, 0, 0);
-            const startOfDay = startOfBusinessDay.toISOString();
-
-            const weekStart = new Date(now);
-            weekStart.setDate(now.getDate() - 7);
-            weekStart.setHours(4, 0, 0, 0);
-
-            const lastWeekStart = new Date(weekStart);
-            lastWeekStart.setDate(lastWeekStart.getDate() - 7);
-
-            const [ordersRes, lowStockRes, pendingRes, weekOrdersRes, lastWeekRes, staffRes] = await Promise.all([
-                supabase.from('orders').select('total_amount, order_items(*, menu_items(name))').gte('created_at', startOfDay).eq('status', 'completed'),
-                supabase.from('ingredients').select('*', { count: 'exact', head: true }).lt('current_stock', 5),
-                supabase.from('orders').select('*', { count: 'exact', head: true }).neq('status', 'completed').neq('status', 'cancelled'),
-                supabase.from('orders').select('total_amount').gte('created_at', weekStart.toISOString()).eq('status', 'completed'),
-                supabase.from('orders').select('total_amount').gte('created_at', lastWeekStart.toISOString()).lt('created_at', weekStart.toISOString()).eq('status', 'completed'),
-                supabase.from('shifts').select('user_id').is('clock_out', null),
-            ]);
-
-            const orders = (ordersRes.data as { total_amount: number; order_items: { menu_items: { name: string } | null; quantity: number }[] | null }[]) || [];
-            const dailyRevenue = orders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-
-            const itemMap: Record<string, number> = {};
-            orders.forEach(o => o.order_items?.forEach(item => {
-                const name = item.menu_items?.name || 'Unknown';
-                itemMap[name] = (itemMap[name] || 0) + item.quantity;
-            }));
-            const top = Object.entries(itemMap).sort(([, a], [, b]) => b - a)[0];
-            setTopItem(top ? { name: top[0], count: top[1] } : null);
-
-            const weekRevenue = ((weekOrdersRes.data as { total_amount: number }[]) || []).reduce((s, o) => s + Number(o.total_amount || 0), 0);
-            const lastWeekRevenue = ((lastWeekRes.data as { total_amount: number }[]) || []).reduce((s, o) => s + Number(o.total_amount || 0), 0);
-
-            setStats({
-                dailyRevenue,
-                orderCount: orders.length,
-                lowStockCount: lowStockRes.count || 0,
-                pendingOrders: pendingRes.count || 0,
-            });
-            setWeekStats({ revenue: weekRevenue, lastWeekRevenue });
-            setStaffOnDuty((staffRes.data as StaffMember[]) || []);
-        } catch (err) {
-            console.error('Dashboard fetch error:', err);
-            toast.error('Failed to load dashboard data');
-        }
-    }
-
-    useEffect(() => {
-        fetchStats();
-        const subscription = supabase
-            .channel('dashboard_realtime')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchStats)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'shifts' }, fetchStats)
-            .subscribe();
-        return () => { supabase.removeChannel(subscription); };
-    }, []);
-
-    const weekTrend = weekStats.lastWeekRevenue > 0
-        ? ((weekStats.revenue - weekStats.lastWeekRevenue) / weekStats.lastWeekRevenue) * 100
+    const weekTrend = data && data.lastWeekRevenue > 0
+        ? ((data.weekRevenue - data.lastWeekRevenue) / data.lastWeekRevenue) * 100
         : null;
 
     return (
@@ -178,32 +90,28 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5 mb-8 md:mb-10">
                 <StatCard
                     title="Daily Revenue"
-                    value={`LKR ${stats.dailyRevenue.toLocaleString()}`}
-                    subtext={`${stats.orderCount} orders today`}
+                    value={`LKR ${(data?.dailyRevenue ?? 0).toLocaleString()}`}
+                    subtext={`${data?.orderCount ?? 0} orders today`}
                     color="primary"
-                    delay={0.1}
                 ><DollarSign size={28} strokeWidth={2} /></StatCard>
                 <StatCard
                     title="This Week"
-                    value={`LKR ${weekStats.revenue.toLocaleString()}`}
+                    value={`LKR ${(data?.weekRevenue ?? 0).toLocaleString()}`}
                     subtext="vs last week"
                     color="secondary"
-                    delay={0.15}
                     trend={weekTrend}
                 ><BarChart2 size={28} strokeWidth={2} /></StatCard>
                 <StatCard
                     title="Pending Orders"
-                    value={stats.pendingOrders}
+                    value={data?.pendingOrders ?? 0}
                     subtext="In kitchen / ready"
                     color="primary"
-                    delay={0.2}
                 ><Clock size={28} strokeWidth={2} /></StatCard>
                 <StatCard
                     title="Low Stock Alerts"
-                    value={stats.lowStockCount}
+                    value={data?.lowStockCount ?? 0}
                     subtext="Items need restocking"
                     color="danger"
-                    delay={0.25}
                 ><AlertCircle size={28} strokeWidth={2} /></StatCard>
             </div>
 
@@ -215,8 +123,8 @@ const Dashboard = () => {
                     <div className="p-3 bg-primary/10 rounded-xl text-primary text-2xl">🏆</div>
                     <div>
                         <p className="text-text-muted text-xs font-bold uppercase tracking-wider">Today's Top Item</p>
-                        <p className="font-bold text-text text-lg mt-0.5">{topItem?.name || '—'}</p>
-                        <p className="text-text-muted text-sm">{topItem ? `${topItem.count} sold` : 'No sales yet'}</p>
+                        <p className="font-bold text-text text-lg mt-0.5">{data?.topItem?.name || '—'}</p>
+                        <p className="text-text-muted text-sm">{data?.topItem ? `${data.topItem.count} sold` : 'No sales yet'}</p>
                     </div>
                 </motion.div>
 
@@ -228,7 +136,7 @@ const Dashboard = () => {
                     </div>
                     <div>
                         <p className="text-text-muted text-xs font-bold uppercase tracking-wider">Staff on Duty</p>
-                        <p className="font-bold text-text text-3xl mt-0.5">{staffOnDuty.length}</p>
+                        <p className="font-bold text-text text-3xl mt-0.5">{data?.staffOnDuty ?? 0}</p>
                         <p className="text-text-muted text-sm">Clocked in now</p>
                     </div>
                 </motion.div>
@@ -241,7 +149,7 @@ const Dashboard = () => {
                     </div>
                     <div>
                         <p className="text-text-muted text-xs font-bold uppercase tracking-wider">Orders Today</p>
-                        <p className="font-bold text-text text-3xl mt-0.5">{stats.orderCount}</p>
+                        <p className="font-bold text-text text-3xl mt-0.5">{data?.orderCount ?? 0}</p>
                         <p className="text-text-muted text-sm">Completed orders</p>
                     </div>
                 </motion.div>

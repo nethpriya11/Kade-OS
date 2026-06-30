@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-// eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
 import { Lock, User, ArrowRight, Loader } from 'lucide-react';
 import { logAuthAction } from '../lib/auditLog';

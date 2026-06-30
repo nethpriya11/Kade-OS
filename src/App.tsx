@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -21,6 +21,7 @@ const Staff = lazy(() => import('./pages/Staff'));
 const AuditLog = lazy(() => import('./pages/AuditLog'));
 
 import ProtectedRoute from './components/ProtectedRoute';
+import QueryProvider from './components/QueryProvider';
 import { Toaster } from 'sonner';
 import SyncManager from './components/SyncManager';
 import Calculator from './components/Calculator';
@@ -28,6 +29,7 @@ import RealtimeManager from './components/RealtimeManager';
 
 function App() {
   return (
+    <QueryProvider>
     <Router>
       <Toaster position="top-center" richColors theme="dark" />
       <SyncManager />
@@ -62,7 +64,9 @@ function App() {
         </Routes>
       </Suspense>
     </Router>
+    </QueryProvider>
   );
 }
 
 export default App;
+
